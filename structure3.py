@@ -988,6 +988,17 @@ class msymStruct(CasadiStructured,MasterGettable,VertsplitStructure):
   def __MX__(self):
     return self.cat
 
+  def is_column(self):
+    return True
+
+  def is_valid_input(self):
+    return True
+
+  def numel(self):
+    return self.size
+
+  
+
 
 
 
