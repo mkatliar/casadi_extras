@@ -1108,6 +1108,12 @@ class MXVeccatStruct(CasadiStructured,MasterGettable):
   def __MX__(self):
     return self.cat
 
+  def is_column(self):
+    return True
+
+  def numel(self):
+    return self.size
+
   @property
   def master(self):
     if any(e is None for e in self.storage):
