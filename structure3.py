@@ -994,6 +994,9 @@ class msymStruct(CasadiStructured,MasterGettable,VertsplitStructure):
   def is_valid_input(self):
     return True
 
+  def is_dense(self):
+    return True
+
   def numel(self):
     return self.size
 
