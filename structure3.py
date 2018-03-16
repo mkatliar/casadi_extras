@@ -1114,6 +1114,9 @@ class MXVeccatStruct(CasadiStructured,MasterGettable):
   def is_column(self):
     return True
 
+  def is_dense(self):
+    return True
+
   def numel(self):
     return self.size
 
