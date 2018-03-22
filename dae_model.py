@@ -13,7 +13,7 @@ class Dae(object):
     def __init__(self, **kwargs):
         """Constructor
 
-        Dae(x, z, u, p, ode, alg)
+        Dae(x, z, u, p, ode, alg, quad)
         """
 
         x = kwargs['x']

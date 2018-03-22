@@ -30,7 +30,7 @@ class PdqTest(unittest.TestCase):
             #return np.cos(10 * x) * np.exp(np.sin(10 * x))
 
 
-        pdq = cl.cheb(100, x0=-1, xf=1)
+        pdq = cl.cheb(100, t0=-1, tf=1)
 
         y = f(pdq.x)
         xx = np.linspace(pdq.x0, pdq.xf, 400)
@@ -74,14 +74,14 @@ class ChebTest(unittest.TestCase):
     """
 
     def test_0(self):
-        pdq = cl.cheb(0, x0=-1, xf=1)
+        pdq = cl.cheb(0, t0=-1, tf=1)
 
         nptest.assert_allclose(pdq.x, np.array([1]))
         nptest.assert_allclose(pdq.D, np.array([[0]]))
 
 
     def test_1(self):
-        pdq = cl.cheb(1, x0=-1, xf=1)
+        pdq = cl.cheb(1, t0=-1, tf=1)
 
         nptest.assert_allclose(np.flip(pdq.x, 0), np.array([1, -1]))
         nptest.assert_allclose(np.rot90(pdq.D, 2), np.array([
@@ -91,7 +91,7 @@ class ChebTest(unittest.TestCase):
 
 
     def test_2(self):
-        pdq = cl.cheb(2, x0=-1, xf=1)
+        pdq = cl.cheb(2, t0=-1, tf=1)
 
         nptest.assert_allclose(np.rot90(pdq.D, 2), np.array([
             [1.5, -2, 0.5],
@@ -101,7 +101,7 @@ class ChebTest(unittest.TestCase):
 
 
     def test_3(self):
-        pdq = cl.cheb(3, x0=-1, xf=1)
+        pdq = cl.cheb(3, t0=-1, tf=1)
 
         #nptest.assert_almost_equal(x, np.array([1, -1]))
         nptest.assert_allclose(np.rot90(pdq.D, 2), np.array([
@@ -119,7 +119,7 @@ class DiffTest(unittest.TestCase):
         """Test differentiation using Chebyshev matrix
         """
         N = 20
-        pdq = cl.cheb(N, x0=0, xf=2)
+        pdq = cl.cheb(N, t0=0, tf=2)
         D = pdq.D
         x = pdq.x
 
@@ -140,7 +140,7 @@ class IvpTest(unittest.TestCase):
 
         N = 10
         tf = 1
-        pdq = cl.cheb(N, x0=0, xf=tf)
+        pdq = cl.cheb(N, t0=0, tf=tf)
         D = pdq.D
 
         var = ct.struct_symMX([
@@ -169,7 +169,7 @@ class IvpTest(unittest.TestCase):
         tf = 1
         
         dae = dae_model.Dae(x=x, ode=xdot)
-        pdq = cl.cheb(N, x0=0, xf=tf)
+        pdq = cl.cheb(N, t0=0, tf=tf)
         
         integrator = cl.collocationIntegrator('integrator', dae, pdq)
         sol = integrator(x0=1)
@@ -190,7 +190,7 @@ class IvpTest(unittest.TestCase):
         tf = 2
         
         dae = dae_model.Dae(x=x, z=z, u=u, ode=xdot, alg=alg)
-        pdq = cl.cheb(N, x0=0, xf=tf)
+        pdq = cl.cheb(N, t0=0, tf=tf)
         
         integrator = cl.collocationIntegrator('integrator', dae, pdq)
 
@@ -215,7 +215,7 @@ class IvpTest(unittest.TestCase):
         tf = 2
         
         dae = dae_model.Dae(x=x, z=z, ode=xdot, alg=alg, quad=q)
-        pdq = cl.cheb(N, x0=0, xf=tf)
+        pdq = cl.cheb(N, t0=0, tf=tf)
         
         integrator = cl.collocationIntegrator('integrator', dae, pdq)
 
@@ -253,7 +253,7 @@ class IvpTest(unittest.TestCase):
         ts = 1  # time step
 
         # PDQ
-        pdq = cl.cheb(N, x0=0, xf=ts)
+        pdq = cl.cheb(N, t0=0, tf=ts)
         
         # DAE model
         dae = dae_model.Dae(x=x.cat, ode=ode.cat, u=u, quad=quad)
@@ -316,7 +316,7 @@ class IvpTest(unittest.TestCase):
         ts = 1  # time step
 
         # PDQ
-        pdq = cl.cheb(N, x0=0, xf=ts)
+        pdq = cl.cheb(N, t0=0, tf=ts)
         
         # DAE model
         dae = dae_model.Dae(x=x.cat, ode=ode.cat, u=u, quad=quad)

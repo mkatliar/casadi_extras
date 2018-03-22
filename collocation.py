@@ -112,7 +112,7 @@ def barycentricInterpolator(x):
     return p
 
 
-def cheb(N, x0, xf):
+def cheb(N, t0, tf):
     """Chebyshev grid and differentiation matrix
 
     The code is based on cheb.m function from the book
@@ -133,7 +133,7 @@ def cheb(N, x0, xf):
         D = np.outer(c, 1 / c) / (dX + np.eye(N + 1)) # off-diagonal entries
         D = D - np.diag(np.sum(D, axis=1))    # diagonal entries
 
-    return Pdq(np.rot90(2 * D / (xf - x0), 2), (np.flip(x, 0) + 1) / 2 * (xf - x0) + x0)
+    return Pdq(np.rot90(2 * D / (tf - t0), 2), (np.flip(x, 0) + 1) / 2 * (tf - t0) + t0)
 
 
 class CollocationScheme(object):
