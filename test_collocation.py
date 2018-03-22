@@ -32,12 +32,12 @@ class PdqTest(unittest.TestCase):
 
         pdq = cl.cheb(100, t0=-1, tf=1)
 
-        y = f(pdq.x)
-        xx = np.linspace(pdq.x0, pdq.xf, 400)
+        y = f(pdq.t)
+        xx = np.linspace(pdq.t0, pdq.tf, 400)
         yy = f(xx)
 
-        fp = cl.polynomialInterpolator(pdq.x)
-        fb = cl.barycentricInterpolator(pdq.x)
+        fp = cl.polynomialInterpolator(pdq.t)
+        fb = cl.barycentricInterpolator(pdq.t)
         yp = fp(y, xx)
         yb = fb(y, xx)
         
@@ -76,14 +76,14 @@ class ChebTest(unittest.TestCase):
     def test_0(self):
         pdq = cl.cheb(0, t0=-1, tf=1)
 
-        nptest.assert_allclose(pdq.x, np.array([1]))
+        nptest.assert_allclose(pdq.t, np.array([1]))
         nptest.assert_allclose(pdq.D, np.array([[0]]))
 
 
     def test_1(self):
         pdq = cl.cheb(1, t0=-1, tf=1)
 
-        nptest.assert_allclose(np.flip(pdq.x, 0), np.array([1, -1]))
+        nptest.assert_allclose(np.flip(pdq.t, 0), np.array([1, -1]))
         nptest.assert_allclose(np.rot90(pdq.D, 2), np.array([
             [0.5, -0.5],
             [0.5, -0.5]
@@ -121,10 +121,10 @@ class DiffTest(unittest.TestCase):
         N = 20
         pdq = cl.cheb(N, t0=0, tf=2)
         D = pdq.D
-        x = pdq.x
+        t = pdq.t
 
-        y = np.exp(x) * np.sin(5 * x)
-        nptest.assert_allclose(np.dot(D, y), y + np.exp(x) * np.cos(5 * x) * 5, atol=1e-8, rtol=0)
+        y = np.exp(t) * np.sin(5 * t)
+        nptest.assert_allclose(np.dot(D, y), y + np.exp(t) * np.cos(5 * t) * 5, atol=1e-8, rtol=0)
 
 
 class IvpTest(unittest.TestCase):

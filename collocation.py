@@ -15,23 +15,23 @@ class Pdq(object):
     https://link.springer.com/content/pdf/10.1007%2F978-1-4471-0407-0.pdf
     """
 
-    def __init__(self, D, x):
+    def __init__(self, D, t):
         """Constructor
 
         @param D differentiation matrix
-        @param x collocation points from left to right.
+        @param t collocation points from left to right.
         """
 
         assert D.shape[0] == D.shape[1] and D.shape[0] > 0
         N = D.shape[0] - 1
 
-        assert x.shape == (N + 1,)
+        assert t.shape == (N + 1,)
 
         # Ensure that the points are from left to right.
-        assert np.all(np.diff(x) > 0)
+        assert np.all(np.diff(t) > 0)
 
         self._D = D
-        self._x = x
+        self._t = t
         self._N = N
 
 
@@ -42,9 +42,9 @@ class Pdq(object):
 
 
     @property
-    def x(self):
+    def t(self):
         """Collocation points"""
-        return self._x
+        return self._t
 
 
     @property
@@ -54,20 +54,20 @@ class Pdq(object):
 
 
     @property
-    def x0(self):
+    def t0(self):
         """The leftmost collocation point"""
-        return self._x[0]
+        return self._t[0]
 
 
     @property
-    def xf(self):
+    def tf(self):
         """The rightmost collocation point"""
-        return self._x[-1]
+        return self._t[-1]
 
 
     def intervalLength(self):
         """Distance between the leftmost and the rightmost collocation points"""
-        return self._x[-1] - self._x[0]
+        return self._t[-1] - self._t[0]
 
 
 def polynomialInterpolator(x):
@@ -165,9 +165,9 @@ class CollocationScheme(object):
         Xc = cs.MX.sym('Xc', dae.nx, N)
         Zc = cs.MX.sym('Zc', dae.nz, N)
 
-        dae_fun = dae.createFunction('dae', ['x', 'z', 'u', 'p'], ['ode', 'alg', 'quad'])
+        dae_fun = dae.createFunction('dae', ['x', 'z', 'u', 'p', 't'], ['ode', 'alg', 'quad'])
         dae_map = dae_fun.map('dae_map', 'serial', N, [2, 3], [])
-        dae_out = dae_map(x=Xc, z=Zc, u=dae.u, p=dae.p)
+        dae_out = dae_map(x=Xc, z=Zc, u=dae.u, p=dae.p, t=pdq.t[1 :])
 
         x0c = dae.x
         eqc = ct.struct_MX([
@@ -213,7 +213,7 @@ class CollocationScheme(object):
         self._qf = f_clc_out['qf']
         self._x0 = X0
         self._p = dae.p
-        self._t = np.hstack([pdq.x[1 :] + k * pdq.intervalLength() for k in range(NT)])
+        self._t = np.hstack([pdq.t[1 :] + k * pdq.intervalLength() for k in range(NT)])
         self._pdq = pdq
 
 
@@ -298,7 +298,7 @@ class CollocationScheme(object):
     def interpolator(self):
         """Create interpolating function"""
 
-        fi_cl = barycentricInterpolator(self._pdq.x)
+        fi_cl = barycentricInterpolator(self._pdq.t)
 
         def interp(x0, x, t):
             l = []

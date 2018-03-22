@@ -73,6 +73,18 @@ class Dae(object):
         else:
             p = cs.MX.sym('p', 0)
 
+        if 't' in kwargs:
+            t = kwargs['t']
+
+            if not t.is_valid_input():
+                raise ValueError('t must be a valid input (purely symbolic)')
+
+            if not t.is_scalar():
+                raise ValueError('t must be scalar')
+
+        else:
+            t = cs.MX.sym('t')
+
         if 'quad' in kwargs:
             quad = kwargs['quad']
         else:
@@ -82,6 +94,7 @@ class Dae(object):
         self._z = z
         self._u = u
         self._p = p
+        self._t = t
         self._ode = ode
         self._alg = alg
         self._quad = quad
@@ -126,6 +139,11 @@ class Dae(object):
     @property
     def p(self):
         return self._p
+
+
+    @property
+    def t(self):
+        return self._t
 
 
     @property
@@ -176,7 +194,7 @@ def parallel(models):
     '''
     
     d = {}
-    for attr in ['x', 'z', 'u', 'p', 'ode', 'alg', 'quad']:
+    for attr in ['x', 'z', 'u', 'p', 'ode', 'alg', 'quad']: # TODO: what do we do with t?
         d[attr] = ct.struct_MX([ct.entry('model_{0}'.format(i), expr=getattr(m, attr)) for i, m in enumerate(models)])
 
     return Dae(**d)
