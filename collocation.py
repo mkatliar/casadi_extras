@@ -18,6 +18,9 @@ class Pdq(object):
     def __init__(self, D, t):
         """Constructor
 
+        TODO: make the ctor accept the list of collocation interval ends 
+        and a collocation point generating funciton?
+
         @param D differentiation matrix
         @param t collocation points from left to right.
         """
@@ -206,6 +209,12 @@ class CollocationScheme(object):
     def t(self):
         """Collocation points as time vector"""
         return self._t
+
+
+    @property
+    def numTotalCollocationPoints(self):
+        """Total number of collocation points"""
+        return self._t.size
 
 
     @property
