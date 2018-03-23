@@ -177,6 +177,27 @@ class IvpTest(unittest.TestCase):
         nptest.assert_allclose(sol['xf'], 1 * np.exp(1 * tf))
 
 
+    def test_collocation_integrator_ode_time_dependent(self):
+        """Test collocation_integrator function with time-dependent ODE
+        """
+        x = cs.MX.sym('x')
+        t = cs.MX.sym('t')
+        xdot = t ** 2
+
+        N = 10
+        x0 = 1.1
+        t0 = 2.4
+        tf = 3.9
+        
+        dae = dae_model.Dae(x=x, ode=xdot, t=t)
+        pdq = cl.cheb(N, t0=0, tf=tf - t0)
+        
+        integrator = cl.collocationIntegrator('integrator', dae, pdq, t0=t0)
+        sol = integrator(x0=x0)
+
+        nptest.assert_allclose(sol['xf'], x0 + tf ** 3 / 3 - t0 ** 3 / 3)
+
+
     def test_collocation_integrator_dae(self):
         """Test collocation_integrator function with DAE
         """

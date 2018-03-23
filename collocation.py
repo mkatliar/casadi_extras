@@ -144,7 +144,7 @@ class CollocationScheme(object):
     for a given DAE model and differentiation matrix.
     """
 
-    def __init__(self, dae, pdq, NT, parallelization='serial'):
+    def __init__(self, dae, pdq, NT, t0=0, parallelization='serial'):
         """Constructor
 
         @param NT number of intervals
@@ -171,7 +171,7 @@ class CollocationScheme(object):
         Uc = cs.horzcat(*[cs.repmat(U[:, k], 1, N) for k in range(NT)])
 
         # Points at which the derivatives are calculated
-        tc = np.hstack([pdq.t[: -1] + k * pdq.intervalLength() for k in range(NT)] + [NT * pdq.intervalLength() + pdq.t[0]])
+        tc = np.hstack([pdq.t[: -1] + k * pdq.intervalLength() for k in range(NT)] + [NT * pdq.intervalLength() + pdq.t[0]]) - pdq.t[0] + t0
 
         dae_fun = dae.createFunction('dae', ['x', 'z', 'u', 'p', 't'], ['ode', 'alg', 'quad'])
         dae_map = dae_fun.map('dae_map', 'serial', N * NT, [3], [])
@@ -298,12 +298,12 @@ class CollocationScheme(object):
         return interp
 
 
-def collocationIntegrator(name, dae, pdq):
+def collocationIntegrator(name, dae, pdq, t0=0):
     """Make an integrator based on collocation method
     """
 
     N = pdq.N
-    scheme = CollocationScheme(dae, pdq, 1)
+    scheme = CollocationScheme(dae, pdq, 1, t0=t0)
 
     x0 = cs.MX.sym('x0', dae.nx)
     X = scheme.x
