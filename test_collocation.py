@@ -262,7 +262,7 @@ class IvpTest(unittest.TestCase):
         scheme = cl.CollocationScheme(dae, pdq, NT)
 
         # Optimization variable
-        w = scheme.combine(['x0', 'x', 'z', 'u'])
+        w = scheme.combine(['x', 'z', 'u'])
 
         # Objective
         f = cs.sum2(scheme.qf)
@@ -291,7 +291,7 @@ class IvpTest(unittest.TestCase):
 
 
     def test_directCollocationReach(self):
-        """Test direct collocation on a s toy problem
+        """Test direct collocation on a toy problem
 
         The problem: bring the double integrator from state [0, 0] to state [1, 0]
         while minimizing L2 norm of the control input.
@@ -325,7 +325,7 @@ class IvpTest(unittest.TestCase):
         scheme = cl.CollocationScheme(dae, pdq, NT)
 
         # Optimization variable
-        w = scheme.combine(['x0', 'x', 'z', 'u'])
+        w = scheme.combine(['x', 'z', 'u'])
 
         # Objective
         f = cs.sum2(scheme.qf)
@@ -349,14 +349,14 @@ class IvpTest(unittest.TestCase):
         sol_w = w(sol['x'])
 
         # Check against the known solution
-        nptest.assert_allclose(sol_w['u'], [[0.2, 0.1, 0, -0.1, -0.2]], atol=1e-8)
+        nptest.assert_allclose(sol_w['u'], [[0.2, 0.1, 0, -0.1, -0.2]], atol=1e-16)
 
         plt.plot(scheme.t, sol_w['x'].T, '.-')
         plt.hold(True)
 
         fi = scheme.interpolator()
         t = np.linspace(0, NT * ts, num=50)
-        plt.plot(t, fi(sol_w['x0'], sol_w['x'], t).T)
+        plt.plot(t, fi(sol_w['x'], t).T)
 
         plt.show()
 

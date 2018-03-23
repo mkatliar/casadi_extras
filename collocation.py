@@ -92,6 +92,9 @@ def barycentricInterpolator(x):
 
     def p(u, xq):
         r = []
+        
+        # Converting to np.array is a workaround for https://github.com/casadi/casadi/issues/2221
+        u = np.array(u)
 
         for xi in xq:
             # Check if xi is in x
@@ -160,60 +163,42 @@ class CollocationScheme(object):
         N = pdq.N
 
         #
-        # Define variables and functions corresponfing to a single control interval
+        # Define variables and functions corresponfing to all control intervals
         # 
-        Xc = cs.MX.sym('Xc', dae.nx, N)
-        Zc = cs.MX.sym('Zc', dae.nz, N)
+        Xc = cs.MX.sym('Xc', dae.nx, N * NT + 1)
+        Zc = cs.MX.sym('Zc', dae.nz, N * NT)
+        U = cs.MX.sym('U', dae.nu, NT)
+        Uc = cs.horzcat(*[cs.repmat(U[:, k], 1, N) for k in range(NT)])
+
+        # Points at which the derivatives are calculated
+        tc = np.hstack([pdq.t[: -1] + k * pdq.intervalLength() for k in range(NT)] + [NT * pdq.intervalLength() + pdq.t[0]])
 
         dae_fun = dae.createFunction('dae', ['x', 'z', 'u', 'p', 't'], ['ode', 'alg', 'quad'])
-        dae_map = dae_fun.map('dae_map', 'serial', N, [2, 3], [])
-        dae_out = dae_map(x=Xc, z=Zc, u=dae.u, p=dae.p, t=pdq.t[1 :])
+        dae_map = dae_fun.map('dae_map', 'serial', N * NT, [3], [])
+        dae_out = dae_map(x=Xc[:, : -1], z=Zc, u=Uc, p=dae.p, t=tc[: -1])
 
-        x0c = dae.x
+        eqc_ode = [dae_out['ode'][:, k : k + N] - cs.mtimes(Xc[:, k : k + N + 1], pdq.D[: -1, :].T) for k in range(0, N * NT, N)]
         eqc = ct.struct_MX([
-            ct.entry('eqc_ode', expr=dae_out['ode'] - cs.mtimes(cs.horzcat(x0c, Xc), pdq.D[1 :, :].T)),
+            ct.entry('eqc_ode', expr=cs.horzcat(*eqc_ode)),
             ct.entry('eqc_alg', expr=dae_out['alg'])
         ])
 
         # Calculate the quadrature from the equation 
-        # Q(var['X'], var['Z'], p) - cs.mtimes(var['Q'], D[: -1, : -1].T)
-        Qc = cs.transpose(cs.solve(pdq.D[1 :, 1 :], cs.transpose(dae_out['quad'])))
-
-        #
-        # Repeat the scheme NT times
-        #
-        f_clc = cs.Function('f_clc', [x0c, Xc, Zc, dae.u, dae.p], [eqc.cat, Qc, Qc[:, -1]],
-            ['x0', 'X', 'Z', 'u', 'p'], ['eq', 'Q', 'qf'])
-        f_clc_map = f_clc.map('f_clc_map', parallelization, NT, [4], [])
-
-        X0 = cs.MX.sym('X0', dae.nx, NT)
-        X = cs.MX.sym('X', dae.nx, N * NT)
-        Z = cs.MX.sym('Z', dae.nz, N * NT)
-        U = cs.MX.sym('U', dae.nu, NT)
-
-        f_clc_out = f_clc_map(x0=X0, X=X, Z=Z, u=U, p=dae.p)
-
-        # Continuity equations
-        continuity_eq = X0[:, 1 :] - X[:, np.arange(NT - 1) * N + N - 1]
-
-        # All equations
-        eq = ct.struct_MX([
-            ct.entry('eq_collocation', expr=f_clc_out['eq']),
-            ct.entry('eq_continuity', expr=continuity_eq)
-        ])
+        # Q(var['X'], var['Z'], p) - cs.mtimes(var['Q'], D[: -1, 1 :].T)
+        Qc = [cs.transpose(cs.solve(pdq.D[: -1, 1 :], cs.transpose(dae_out['quad'][:, k : k + N]))) for k in range(0, N * NT, N)]
 
         self._N = N
         self._NT = NT
 
-        self._eq = eq.cat
-        self._x = X
-        self._z = Z
+        self._eq = eqc.cat
+        self._x = Xc
+        self._z = Zc
         self._u = U
-        self._q = f_clc_out['Q']
-        self._qf = f_clc_out['qf']
-        self._x0 = X0
+        self._q = cs.horzcat(*Qc)
+        self._qf = cs.horzcat(*[q[:, -1] for q in Qc])
+        self._x0 = Xc[:, range(0, N * NT, N)]
         self._p = dae.p
-        self._t = np.hstack([pdq.t[1 :] + k * pdq.intervalLength() for k in range(NT)])
+        self._t = tc
         self._pdq = pdq
 
 
@@ -271,7 +256,7 @@ class CollocationScheme(object):
     @property
     def xf(self):
         """State at the end of each control interval"""
-        return self._x[:, range(self._N - 1, self._NT * self._N, self._N)]
+        return self._x[:, range(self._N, self._NT * self._N + 1, self._N)]
 
 
     @property
@@ -300,13 +285,13 @@ class CollocationScheme(object):
 
         fi_cl = barycentricInterpolator(self._pdq.t)
 
-        def interp(x0, x, t):
+        def interp(x, t):
             l = []
             ts = self._pdq.intervalLength()
 
             for ti in t:
                 i = min(max(int(ti // ts), 0), self._NT - 1)  # interval index
-                l.append(fi_cl(np.hstack((x0[:, i], x[:, self._N * i : self._N * (i + 1)])), [ti - ts * i]))
+                l.append(fi_cl(x[:, self._N * i : self._N * (i + 1) + 1], [ti - ts * i]))
 
             return np.hstack(l)
 
@@ -320,22 +305,19 @@ def collocationIntegrator(name, dae, pdq):
     N = pdq.N
     scheme = CollocationScheme(dae, pdq, 1)
 
-    q = dae.createFunction('q', ['x', 'z', 'u', 'p'], ['quad'])
-    Q = q.map('Q', 'serial', N, [2], [])
-
-    x0 = scheme.x0
+    x0 = cs.MX.sym('x0', dae.nx)
     X = scheme.x
     Z = scheme.z
     z0 = dae.z
 
     # Solve the collocation equations w.r.t. (X,Z)
     var = scheme.combine(['x', 'z'])
-    eq = cs.Function('eq', [var, x0, scheme.u, scheme.p], [scheme.eq])
+    eq = cs.Function('eq', [var, x0, scheme.u, scheme.p], [cs.vertcat(scheme.eq, scheme.x[:, 0] - x0)])
     rf = cs.rootfinder('rf', 'newton', eq)
 
     # Initial point for the rootfinder
     w0 = ct.struct_MX(var)
-    w0['x'] = cs.repmat(x0, 1, N)
+    w0['x'] = cs.repmat(x0, 1, N + 1)
     w0['z'] = cs.repmat(z0, 1, N)
     
     sol = var(rf(w0, x0, dae.u, dae.p))
