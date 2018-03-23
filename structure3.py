@@ -1117,6 +1117,9 @@ class MXVeccatStruct(CasadiStructured,MasterGettable):
   def is_dense(self):
     return True
 
+  def is_valid_input(self):
+    return self.cat.is_valid_input()
+
   def numel(self):
     return self.size
 
