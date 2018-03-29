@@ -176,7 +176,7 @@ class CollocationScheme(object):
         # Points at which the derivatives are calculated
         tc = np.hstack([pdq.t[: -1] + k * pdq.intervalLength() for k in range(NT)] + [NT * pdq.intervalLength() + pdq.t[0]]) - pdq.t[0] + t0
 
-        dae_fun = dae.createFunction('dae', ['x', 'z', 'u', 'p', 't'], ['ode', 'alg', 'quad'])
+        dae_fun = dae.createFunction('dae', ['x', 'z', 'u', 'p', 't'], ['ode', 'alg', 'quad']) #.expand() ?
         dae_map = dae_fun.map('dae_map', 'serial', N * NT, [3], [])
         dae_out = dae_map(x=Xc[:, : -1], z=Zc, u=Uc, p=dae.p, t=tc[: -1])
 
@@ -189,6 +189,8 @@ class CollocationScheme(object):
         # Calculate the quadrature from the equation 
         # Q(var['X'], var['Z'], p) - cs.mtimes(var['Q'], D[: -1, 1 :].T)
         Qc = [cs.transpose(cs.solve(pdq.D[: -1, 1 :], cs.transpose(dae_out['quad'][:, k : k + N]))) for k in range(0, N * NT, N)]
+        #invD = cs.inv(pdq.D[: -1, 1 :])
+        #Qc = [cs.transpose(cs.mtimes(invD, cs.transpose(dae_out['quad'][:, k : k + N]))) for k in range(0, N * NT, N)]
 
         self._N = N
         self._NT = NT
