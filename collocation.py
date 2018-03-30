@@ -188,7 +188,7 @@ class CollocationScheme(object):
         if expand:
             dae_fun = dae_fun.expand()  # expand() for speed
 
-        dae_map = dae_fun.map('dae_map', 'serial', N * NT, [3], [])
+        dae_map = dae_fun.map('dae_map', parallelization, N * NT, [3], [])
         dae_out = dae_map(x=Xc[:, : -1], z=Zc, u=Uc, p=dae.p, t=tc[: -1], tdp=tdp_val[:, : -1])
 
         eqc_ode = [dae_out['ode'][:, k : k + N] - cs.mtimes(Xc[:, k : k + N + 1], pdq.D[: -1, :].T) for k in range(0, N * NT, N)]
