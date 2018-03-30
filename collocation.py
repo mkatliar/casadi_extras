@@ -147,7 +147,7 @@ class CollocationScheme(object):
     for a given DAE model and differentiation matrix.
     """
 
-    def __init__(self, dae, pdq, NT, t0=0, parallelization='serial', tdp_fun=None):
+    def __init__(self, dae, pdq, NT, t0=0, parallelization='serial', tdp_fun=None, expand=True):
         """Constructor
 
         @param NT number of intervals
@@ -184,7 +184,10 @@ class CollocationScheme(object):
             tdp_val = np.zeros((0, N * NT + 1))
 
         # DAE function
-        dae_fun = dae.createFunction('dae', ['x', 'z', 'u', 'p', 't', 'tdp'], ['ode', 'alg', 'quad']) #.expand() ?
+        dae_fun = dae.createFunction('dae', ['x', 'z', 'u', 'p', 't', 'tdp'], ['ode', 'alg', 'quad'])
+        if expand:
+            dae_fun = dae_fun.expand()  # expand() for speed
+
         dae_map = dae_fun.map('dae_map', 'serial', N * NT, [3], [])
         dae_out = dae_map(x=Xc[:, : -1], z=Zc, u=Uc, p=dae.p, t=tc[: -1], tdp=tdp_val[:, : -1])
 
