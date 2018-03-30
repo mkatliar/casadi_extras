@@ -147,7 +147,7 @@ class CollocationScheme(object):
     for a given DAE model and differentiation matrix.
     """
 
-    def __init__(self, dae, pdq, NT, t0=0, parallelization='serial'):
+    def __init__(self, dae, pdq, NT, t0=0, parallelization='serial', tdp_fun=None):
         """Constructor
 
         @param NT number of intervals
@@ -176,9 +176,17 @@ class CollocationScheme(object):
         # Points at which the derivatives are calculated
         tc = np.hstack([pdq.t[: -1] + k * pdq.intervalLength() for k in range(NT)] + [NT * pdq.intervalLength() + pdq.t[0]]) - pdq.t[0] + t0
 
-        dae_fun = dae.createFunction('dae', ['x', 'z', 'u', 'p', 't'], ['ode', 'alg', 'quad']) #.expand() ?
+        # Values of the time-dependent parameter
+        if tdp_fun is not None:
+            tdp_val = cs.horzcat(*[tdp_fun(t) for t in tc])
+        else:
+            assert dae.ntdp == 0
+            tdp_val = np.zeros((0, N * NT + 1))
+
+        # DAE function
+        dae_fun = dae.createFunction('dae', ['x', 'z', 'u', 'p', 't', 'tdp'], ['ode', 'alg', 'quad']) #.expand() ?
         dae_map = dae_fun.map('dae_map', 'serial', N * NT, [3], [])
-        dae_out = dae_map(x=Xc[:, : -1], z=Zc, u=Uc, p=dae.p, t=tc[: -1])
+        dae_out = dae_map(x=Xc[:, : -1], z=Zc, u=Uc, p=dae.p, t=tc[: -1], tdp=tdp_val[:, : -1])
 
         eqc_ode = [dae_out['ode'][:, k : k + N] - cs.mtimes(Xc[:, k : k + N + 1], pdq.D[: -1, :].T) for k in range(0, N * NT, N)]
         eqc = ct.struct_MX([
@@ -205,6 +213,7 @@ class CollocationScheme(object):
         self._p = dae.p
         self._t = tc
         self._pdq = pdq
+        self._tdp = tdp_val
 
 
     @property

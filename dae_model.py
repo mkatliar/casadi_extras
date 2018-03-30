@@ -13,7 +13,7 @@ class Dae(object):
     def __init__(self, **kwargs):
         """Constructor
 
-        Dae(x, z, u, p, ode, alg, quad)
+        Dae(x, z, u, p, ode, alg, quad, tdp)
         """
 
         x = kwargs['x']
@@ -90,6 +90,15 @@ class Dae(object):
         else:
             quad = cs.MX.sym('quad', 0)
 
+        if 'tdp' in kwargs:
+            tdp = kwargs['tdp']
+
+            if not tdp.is_valid_input():
+                raise ValueError('tdp must be a valid input (purely symbolic)')
+
+        else:
+            tdp = cs.MX.sym('tdp', 0)
+
         self._x = x
         self._z = z
         self._u = u
@@ -98,6 +107,7 @@ class Dae(object):
         self._ode = ode
         self._alg = alg
         self._quad = quad
+        self._tdp = tdp
 
 
     '''
@@ -162,6 +172,11 @@ class Dae(object):
 
 
     @property
+    def tdp(self):
+        return self._tdp
+
+
+    @property
     def nx(self):
         return self._x.numel()
 
@@ -179,6 +194,11 @@ class Dae(object):
     @property
     def np(self):
         return self._p.numel()
+
+
+    @property
+    def ntdp(self):
+        return self._tdp.numel()
 
 
     def createFunction(self, name, in_arg, out_arg):
