@@ -994,6 +994,9 @@ class msymStruct(CasadiStructured,MasterGettable,VertsplitStructure):
   def is_valid_input(self):
     return True
 
+  def is_dense(self):
+    return True
+
   def numel(self):
     return self.size
 
@@ -1110,6 +1113,12 @@ class MXVeccatStruct(CasadiStructured,MasterGettable):
 
   def is_column(self):
     return True
+
+  def is_dense(self):
+    return True
+
+  def is_valid_input(self):
+    return self.cat.is_valid_input()
 
   def numel(self):
     return self.size
