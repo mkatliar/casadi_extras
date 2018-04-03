@@ -87,14 +87,18 @@ def polynomialInterpolator(x):
 def barycentricInterpolator(x):
     """Barycentric interpolator with nodes at x"""
 
-    assert x.ndim == 1
-    N = x.size - 1
+    assert np.ndim(x) == 1
+    N = np.size(x) - 1
     n = np.arange(N + 1)
+    x = np.atleast_1d(x)    # Convert to numpy type s.t. the indexing below works
 
     a = [np.prod(x[j] - x[n[n != j]]) for j in n]
 
     def p(u, xq):
         r = []
+
+        # Convert scalar argument to a vector
+        xq = np.atleast_1d(xq)
         
         # Converting to np.array is a workaround for https://github.com/casadi/casadi/issues/2221
         u = np.array(u)
@@ -306,7 +310,7 @@ class CollocationScheme(object):
     def interpolator(self):
         """Create interpolating function"""
 
-        fi_cl = barycentricInterpolator(self._pdq.t)
+        fi_cl = barycentricInterpolator(self._pdq.t[: -1])
 
         def interp(x, t):
             l = []
@@ -314,7 +318,7 @@ class CollocationScheme(object):
 
             for ti in t:
                 i = min(max(int(ti // ts), 0), self._NT - 1)  # interval index
-                l.append(fi_cl(x[:, self._N * i : self._N * (i + 1) + 1], [ti - ts * i]))
+                l.append(fi_cl(x[:, self._N * i : self._N * (i + 1)], [ti - ts * i]))
 
             return np.hstack(l)
 
