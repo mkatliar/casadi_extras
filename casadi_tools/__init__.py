@@ -1,4 +1,5 @@
 from .collocation import CollocationScheme, cheb, Pdq
+from .system_trajectory import SystemTrajectory
 from .dae_model import Dae
 
 from .graph import *
