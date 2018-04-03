@@ -62,12 +62,6 @@ class Pdq(object):
 
 
     @property
-    def D(self):
-        """Differentiation matrix"""
-        return self._D
-
-
-    @property
     def collocationPoints(self):
         """Collocation points"""
         return self._collocationPoints
@@ -139,18 +133,36 @@ class Pdq(object):
         return cs.horzcat(*y)
 
 
-    def interpolator(self):
+    def interpolator(self, continuity='both'):
         """Create interpolating function based on values at collocation points
+
+        @param specifies continuity of the interpolated function at the interval boundaries:
+        - 'left' means that the function in continuous from the left,
+        - 'right' means that the function in continuous from the right,
+        - 'both' means that the function is continuous both from the left and from the right.
         """
 
-        fi_cl = [barycentricInterpolator(self._collocationPoints[g]) for g in self._collocationGroups]
+        # Transform collocation groups depending on the continuity option.
+        groups = []
+
+        for g in self._collocationGroups:
+            if continuity == 'both':
+                groups.append(g)
+            elif continuity == 'left':
+                groups.append(g[1 : ])
+            elif continuity == 'right':
+                groups.append(g[: -1])
+            else:
+                raise ValueError('Invalid "continuity" value {0} in Dae.interpolator()'.format(continuity))
+
+        fi_cl = [barycentricInterpolator(self._collocationPoints[g]) for g in groups]
 
         def interp(x, t):
             l = []
             
             for ti in t:
                 i = np.clip(np.searchsorted(self._intervalBounds, ti, 'right') - 1, 0, len(self._intervalBounds) - 2)  # interval index
-                l.append(fi_cl[i](x[:, self._collocationGroups[i]], ti))
+                l.append(fi_cl[i](x[:, groups[i]], ti))
 
             return np.hstack(l)
 
