@@ -15,27 +15,50 @@ class Pdq(object):
     https://link.springer.com/content/pdf/10.1007%2F978-1-4471-0407-0.pdf
     """
 
-    def __init__(self, D, t):
+    def __init__(self, t, poly_order=5, polynomial_type='cheb'):
         """Constructor
 
-        TODO: make the ctor accept the list of collocation interval ends 
-        and a collocation point generating funciton?
-
-        @param D differentiation matrix
-        @param t collocation points from left to right.
+        @param t N+1 points defining N collocation intervals in ascending order.
+        @param poly_order order of collocation polynomial.
+        @param polynomial_type collocation polynomial type.
         """
 
-        assert D.shape[0] == D.shape[1] and D.shape[0] > 0
-        N = D.shape[0] - 1
+        N = len(t) - 1
 
-        assert t.shape == (N + 1,)
+        # Make collocation points vector and differential matrices list
+        D = []
+        collocation_points = []
+        collocation_groups = []
+        k = 0
 
-        # Ensure that the points are from left to right.
-        assert np.all(np.diff(t) > 0)
+        for i in range(N):
+            D_i, t_i = cheb(poly_order, t[i], t[i + 1])
+            
+            assert D_i.shape[0] == poly_order + 1 and D_i.shape[1] == poly_order + 1
+            assert t_i.shape == (poly_order + 1,)
+
+            # Ensure that the points are from left to right.
+            assert np.all(np.diff(t_i) > 0)
+
+            D.append(D_i)
+            collocation_points.append(t_i[: -1])
+            collocation_groups.append(np.arange(k, k + poly_order + 1))
+            k += poly_order
+
+        # Append the last point.
+        # TODO: is it needed or not?
+        collocation_points.append(t_i[-1])
+
+        # Stack collocation points in one vector
+        collocation_points = np.hstack(collocation_points)
 
         self._D = D
-        self._t = t
-        self._N = N
+        self._collocationPoints = collocation_points
+
+        # Indices of collocation points belonging to the same interval, including both ends.
+        self._collocationGroups = collocation_groups
+        self._intervalBounds = t
+        self._polyOrder = poly_order
 
 
     @property
@@ -45,32 +68,93 @@ class Pdq(object):
 
 
     @property
-    def t(self):
+    def collocationPoints(self):
         """Collocation points"""
-        return self._t
+        return self._collocationPoints
 
 
     @property
-    def N(self):
+    def intervalBounds(self):
+        """Interval bounds"""
+        return self._intervalBounds
+
+
+    @property
+    def polyOrder(self):
         """Degree of interpolating polynomial"""
-        return self._N
+        return self._polyOrder
 
 
     @property
     def t0(self):
         """The leftmost collocation point"""
-        return self._t[0]
+        return self._collocationPoints[0]
 
 
     @property
     def tf(self):
         """The rightmost collocation point"""
-        return self._t[-1]
+        return self._collocationPoints[-1]
 
 
     def intervalLength(self):
-        """Distance between the leftmost and the rightmost collocation points"""
-        return self._t[-1] - self._t[0]
+        """Distance between the leftmost and the rightmost collocation points
+
+        TODO: deprecate?
+        """
+        return self._collocationPoints[-1] - self._collocationPoints[0]
+
+
+    def derivative(self, y):
+        """Calculate derivative from function values
+        """
+
+        dy = []
+        k = 0
+
+        for D in self._D:
+            N = D.shape[0] - 1
+            dy.append(cs.mtimes(y[:, k : k + N + 1], D[: -1, :].T))
+            k += N
+
+        return cs.horzcat(*dy)
+
+
+    def integral(self, dy):
+        """Calculate integral from derivative values
+        """
+
+        y = []
+        k = 0
+        for D in self._D:
+            N = D.shape[0] - 1
+
+            # Calculate y the equation 
+            # dy = cs.mtimes(y[:, 1 :], D[: -1, 1 :].T)
+            #invD = cs.inv(pdq.D[: -1, 1 :])
+            #Qc = [cs.transpose(cs.mtimes(invD, cs.transpose(dae_out['quad'][:, k : k + N]))) for k in range(0, N * NT, N)]
+            y.append(cs.transpose(cs.solve(D[: -1, 1 :], cs.transpose(dy[:, k : k + N]))))
+            k += N
+
+        return cs.horzcat(*y)
+
+
+    def interpolator(self):
+        """Create interpolating function based on values at collocation points
+        """
+
+        fi_cl = [barycentricInterpolator(self._collocationPoints[g]) for g in self._collocationGroups]
+
+        def interp(x, t):
+            l = []
+            
+            for ti in t:
+                i = np.clip(np.searchsorted(self._intervalBounds, ti, 'right') - 1, 0, len(self._intervalBounds) - 2)  # interval index
+                l.append(fi_cl[i](x[:, self._collocationGroups[i]], ti))
+
+            return np.hstack(l)
+
+        return interp
 
 
 def polynomialInterpolator(x):
@@ -87,14 +171,18 @@ def polynomialInterpolator(x):
 def barycentricInterpolator(x):
     """Barycentric interpolator with nodes at x"""
 
-    assert x.ndim == 1
-    N = x.size - 1
+    assert np.ndim(x) == 1
+    N = np.size(x) - 1
     n = np.arange(N + 1)
+    x = np.atleast_1d(x)    # Convert to numpy type s.t. the indexing below works
 
     a = [np.prod(x[j] - x[n[n != j]]) for j in n]
 
     def p(u, xq):
         r = []
+
+        # Convert scalar argument to a vector
+        xq = np.atleast_1d(xq)
         
         # Converting to np.array is a workaround for https://github.com/casadi/casadi/issues/2221
         u = np.array(u)
@@ -125,8 +213,12 @@ def cheb(N, t0, tf):
     "Spectral Methods in MATLAB" by Lloyd N. Trefethen 
     http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.473.7647&rep=rep1&type=pdf
 
-    @param N number of collocation intervals.
-    @param t distance between the leftmost and the rightmost collocation points.
+    @param N order of collocation polynomial.
+    @param t0 left end of the collocation interval
+    @param t0 right end of the collocation interval
+
+    @return a tuple (D, t) where D is a (N+1)-by-(N+1) differentiation matrix 
+    and t is a vector of points of length N+1 such that t[0] == t0 and t[-1] == tf.
     """
     if N == 0:
         D = np.array([[0]])
@@ -139,7 +231,7 @@ def cheb(N, t0, tf):
         D = np.outer(c, 1 / c) / (dX + np.eye(N + 1)) # off-diagonal entries
         D = D - np.diag(np.sum(D, axis=1))    # diagonal entries
 
-    return Pdq(np.rot90(2 * D / (tf - t0), 2), (np.flip(x, 0) + 1) / 2 * (tf - t0) + t0)
+    return np.rot90(2 * D / (tf - t0), 2), (np.flip(x, 0) + 1) / 2 * (tf - t0) + t0
 
 
 class CollocationScheme(object):
@@ -147,10 +239,9 @@ class CollocationScheme(object):
     for a given DAE model and differentiation matrix.
     """
 
-    def __init__(self, dae, pdq, NT, t0=0, parallelization='serial', tdp_fun=None, expand=True):
+    def __init__(self, dae, pdq, parallelization='serial', tdp_fun=None, expand=True):
         """Constructor
 
-        @param NT number of intervals
         @param pdq Pdq object
         @param dae Dae model
         @param parallelization parallelization of the outer map. Possible set of values is the same as for casadi.Function.map().
@@ -163,45 +254,42 @@ class CollocationScheme(object):
         'Q' -- quadrature values at collocation points depending on x0, X, Z, p.
         """
 
-        N = pdq.N
+        N = len(pdq.collocationPoints)
+        NT = len(pdq.intervalBounds) - 1
 
         #
         # Define variables and functions corresponfing to all control intervals
         # 
-        Xc = cs.MX.sym('Xc', dae.nx, N * NT + 1)
-        Zc = cs.MX.sym('Zc', dae.nz, N * NT)
+        Xc = cs.MX.sym('Xc', dae.nx, N)
+        Zc = cs.MX.sym('Zc', dae.nz, N - 1)
         U = cs.MX.sym('U', dae.nu, NT)
-        Uc = cs.horzcat(*[cs.repmat(U[:, k], 1, N) for k in range(NT)])
+        Uc = cs.horzcat(*[cs.repmat(U[:, k], 1, pdq.polyOrder) for k in range(NT)])
 
         # Points at which the derivatives are calculated
-        tc = np.hstack([pdq.t[: -1] + k * pdq.intervalLength() for k in range(NT)] + [NT * pdq.intervalLength() + pdq.t[0]]) - pdq.t[0] + t0
+        tc = pdq.collocationPoints
 
         # Values of the time-dependent parameter
         if tdp_fun is not None:
             tdp_val = cs.horzcat(*[tdp_fun(t) for t in tc])
         else:
             assert dae.ntdp == 0
-            tdp_val = np.zeros((0, N * NT + 1))
+            tdp_val = np.zeros((0, N))
 
         # DAE function
         dae_fun = dae.createFunction('dae', ['x', 'z', 'u', 'p', 't', 'tdp'], ['ode', 'alg', 'quad'])
         if expand:
             dae_fun = dae_fun.expand()  # expand() for speed
 
-        dae_map = dae_fun.map('dae_map', parallelization, N * NT, [3], [])
+        dae_map = dae_fun.map('dae_map', parallelization, N - 1, [3], [])
         dae_out = dae_map(x=Xc[:, : -1], z=Zc, u=Uc, p=dae.p, t=tc[: -1], tdp=tdp_val[:, : -1])
 
-        eqc_ode = [dae_out['ode'][:, k : k + N] - cs.mtimes(Xc[:, k : k + N + 1], pdq.D[: -1, :].T) for k in range(0, N * NT, N)]
         eqc = ct.struct_MX([
-            ct.entry('eqc_ode', expr=cs.horzcat(*eqc_ode)),
+            ct.entry('eqc_ode', expr=dae_out['ode'] - pdq.derivative(Xc)),
             ct.entry('eqc_alg', expr=dae_out['alg'])
         ])
 
-        # Calculate the quadrature from the equation 
-        # Q(var['X'], var['Z'], p) - cs.mtimes(var['Q'], D[: -1, 1 :].T)
-        Qc = [cs.transpose(cs.solve(pdq.D[: -1, 1 :], cs.transpose(dae_out['quad'][:, k : k + N]))) for k in range(0, N * NT, N)]
-        #invD = cs.inv(pdq.D[: -1, 1 :])
-        #Qc = [cs.transpose(cs.mtimes(invD, cs.transpose(dae_out['quad'][:, k : k + N]))) for k in range(0, N * NT, N)]
+        # Calculate the quadrature
+        Qc = pdq.integral(dae_out['quad'])
 
         self._N = N
         self._NT = NT
@@ -210,9 +298,9 @@ class CollocationScheme(object):
         self._x = Xc
         self._z = Zc
         self._u = U
-        self._q = cs.horzcat(*Qc)
-        self._qf = cs.horzcat(*[q[:, -1] for q in Qc])
-        self._x0 = Xc[:, range(0, N * NT, N)]
+        self._q = Qc
+        self._qf = Qc[:, np.arange(1, NT + 1) * pdq.polyOrder - 1]
+        self._x0 = Xc[:, range(0, N - 1, pdq.polyOrder)]
         self._p = dae.p
         self._t = tc
         self._pdq = pdq
@@ -272,15 +360,12 @@ class CollocationScheme(object):
 
     @property
     def x0(self):
-        """State at the beginning of each control interval"""
+        """State at the beginning of each control interval
+        
+        TODO: deprecate?
+        """
         return self._x0
         
-
-    @property
-    def xf(self):
-        """State at the end of each control interval"""
-        return self._x[:, range(self._N, self._NT * self._N + 1, self._N)]
-
 
     @property
     def eq(self):
@@ -303,30 +388,12 @@ class CollocationScheme(object):
         return ct.struct_MX([ct.entry(w, expr=getattr(self, w)) for w in what])
 
 
-    def interpolator(self):
-        """Create interpolating function"""
-
-        fi_cl = barycentricInterpolator(self._pdq.t)
-
-        def interp(x, t):
-            l = []
-            ts = self._pdq.intervalLength()
-
-            for ti in t:
-                i = min(max(int(ti // ts), 0), self._NT - 1)  # interval index
-                l.append(fi_cl(x[:, self._N * i : self._N * (i + 1) + 1], [ti - ts * i]))
-
-            return np.hstack(l)
-
-        return interp
-
-
-def collocationIntegrator(name, dae, pdq, t0=0):
+def collocationIntegrator(name, dae, pdq):
     """Make an integrator based on collocation method
     """
 
-    N = pdq.N
-    scheme = CollocationScheme(dae, pdq, 1, t0=t0)
+    N = len(pdq.collocationPoints)
+    scheme = CollocationScheme(dae, pdq)
 
     x0 = cs.MX.sym('x0', dae.nx)
     X = scheme.x
@@ -340,8 +407,8 @@ def collocationIntegrator(name, dae, pdq, t0=0):
 
     # Initial point for the rootfinder
     w0 = ct.struct_MX(var)
-    w0['x'] = cs.repmat(x0, 1, N + 1)
-    w0['z'] = cs.repmat(z0, 1, N)
+    w0['x'] = cs.repmat(x0, 1, N)
+    w0['z'] = cs.repmat(z0, 1, N - 1)
     
     sol = var(rf(w0, x0, dae.u, dae.p))
     sol_X = sol['x']

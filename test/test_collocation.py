@@ -30,14 +30,14 @@ class PdqTest(unittest.TestCase):
             #return np.cos(10 * x) * np.exp(np.sin(10 * x))
 
 
-        pdq = cl.cheb(100, t0=-1, tf=1)
+        pdq = cl.Pdq(t=[-1, 1], poly_order=99)
 
-        y = f(pdq.t)
+        y = f(pdq.collocationPoints)
         xx = np.linspace(pdq.t0, pdq.tf, 400)
         yy = f(xx)
 
-        fp = cl.polynomialInterpolator(pdq.t)
-        fb = cl.barycentricInterpolator(pdq.t)
+        fp = cl.polynomialInterpolator(pdq.collocationPoints)
+        fb = cl.barycentricInterpolator(pdq.collocationPoints)
         yp = fp(y, xx)
         yb = fb(y, xx)
         
@@ -74,26 +74,26 @@ class ChebTest(unittest.TestCase):
     """
 
     def test_0(self):
-        pdq = cl.cheb(0, t0=-1, tf=1)
+        D, t = cl.cheb(0, t0=-1, tf=1)
 
-        nptest.assert_allclose(pdq.t, np.array([1]))
-        nptest.assert_allclose(pdq.D, np.array([[0]]))
+        nptest.assert_allclose(t, np.array([1]))
+        nptest.assert_allclose(D, np.array([[0]]))
 
 
     def test_1(self):
-        pdq = cl.cheb(1, t0=-1, tf=1)
+        D, t = cl.cheb(1, t0=-1, tf=1)
 
-        nptest.assert_allclose(np.flip(pdq.t, 0), np.array([1, -1]))
-        nptest.assert_allclose(np.rot90(pdq.D, 2), np.array([
+        nptest.assert_allclose(np.flip(t, 0), np.array([1, -1]))
+        nptest.assert_allclose(np.rot90(D, 2), np.array([
             [0.5, -0.5],
             [0.5, -0.5]
         ]))
 
 
     def test_2(self):
-        pdq = cl.cheb(2, t0=-1, tf=1)
+        D, _ = cl.cheb(2, t0=-1, tf=1)
 
-        nptest.assert_allclose(np.rot90(pdq.D, 2), np.array([
+        nptest.assert_allclose(np.rot90(D, 2), np.array([
             [1.5, -2, 0.5],
             [0.5, 0, -0.5],
             [-0.5, 2, -1.5]
@@ -101,10 +101,10 @@ class ChebTest(unittest.TestCase):
 
 
     def test_3(self):
-        pdq = cl.cheb(3, t0=-1, tf=1)
+        D, _ = cl.cheb(3, t0=-1, tf=1)
 
         #nptest.assert_almost_equal(x, np.array([1, -1]))
-        nptest.assert_allclose(np.rot90(pdq.D, 2), np.array([
+        nptest.assert_allclose(np.rot90(D, 2), np.array([
             [3.1667, -4.0000, 1.3333, -0.5000],
             [1.0000, -0.3333, -1.0000, 0.3333],
             [-0.3333, 1.0000, 0.3333, -1.0000],
@@ -119,9 +119,7 @@ class DiffTest(unittest.TestCase):
         """Test differentiation using Chebyshev matrix
         """
         N = 20
-        pdq = cl.cheb(N, t0=0, tf=2)
-        D = pdq.D
-        t = pdq.t
+        D, t = cl.cheb(N, t0=0, tf=2)
 
         y = np.exp(t) * np.sin(5 * t)
         nptest.assert_allclose(np.dot(D, y), y + np.exp(t) * np.cos(5 * t) * 5, atol=1e-8, rtol=0)
@@ -140,8 +138,7 @@ class IvpTest(unittest.TestCase):
 
         N = 10
         tf = 1
-        pdq = cl.cheb(N, t0=0, tf=tf)
-        D = pdq.D
+        pdq = cl.Pdq(t=[0, tf], poly_order=N)
 
         var = ct.struct_symMX([
             ct.entry('X', shape=(1, N))
@@ -152,7 +149,7 @@ class IvpTest(unittest.TestCase):
 
         x0 = cs.MX.sym('x0')
         eq = cs.Function('eq', [var, x0], 
-            [cs.reshape(F(var['X']) - cs.mtimes(cs.horzcat(x0, var['X']), D[1 :, :].T), var.size, 1)])
+            [cs.reshape(F(cs.horzcat(x0, var['X', :, : -1])) - pdq.derivative(cs.horzcat(x0, var['X'])), var.size, 1)])
         rf = cs.rootfinder('rf', 'newton', eq)
 
         sol = var(rf(var(0), 1))
@@ -169,7 +166,7 @@ class IvpTest(unittest.TestCase):
         tf = 1
         
         dae = dae_model.Dae(x=x, ode=xdot)
-        pdq = cl.cheb(N, t0=0, tf=tf)
+        pdq = cl.Pdq([0, tf], poly_order=N)
         
         integrator = cl.collocationIntegrator('integrator', dae, pdq)
         sol = integrator(x0=1)
@@ -190,9 +187,9 @@ class IvpTest(unittest.TestCase):
         tf = 3.9
         
         dae = dae_model.Dae(x=x, ode=xdot, t=t)
-        pdq = cl.cheb(N, t0=0, tf=tf - t0)
+        pdq = cl.Pdq([t0, tf], poly_order=N)
         
-        integrator = cl.collocationIntegrator('integrator', dae, pdq, t0=t0)
+        integrator = cl.collocationIntegrator('integrator', dae, pdq)
         sol = integrator(x0=x0)
 
         nptest.assert_allclose(sol['xf'], x0 + tf ** 3 / 3 - t0 ** 3 / 3)
@@ -211,7 +208,7 @@ class IvpTest(unittest.TestCase):
         tf = 2
         
         dae = dae_model.Dae(x=x, z=z, u=u, ode=xdot, alg=alg)
-        pdq = cl.cheb(N, t0=0, tf=tf)
+        pdq = cl.Pdq([0, tf], poly_order=N)
         
         integrator = cl.collocationIntegrator('integrator', dae, pdq)
 
@@ -236,7 +233,7 @@ class IvpTest(unittest.TestCase):
         tf = 2
         
         dae = dae_model.Dae(x=x, z=z, ode=xdot, alg=alg, quad=q)
-        pdq = cl.cheb(N, t0=0, tf=tf)
+        pdq = cl.Pdq([0, tf], poly_order=N)
         
         integrator = cl.collocationIntegrator('integrator', dae, pdq)
 
@@ -274,13 +271,13 @@ class IvpTest(unittest.TestCase):
         ts = 1  # time step
 
         # PDQ
-        pdq = cl.cheb(N, t0=0, tf=ts)
+        pdq = cl.Pdq(np.arange(NT + 1) * ts, poly_order=N)
         
         # DAE model
         dae = dae_model.Dae(x=x.cat, ode=ode.cat, u=u, quad=quad)
 
         # Create direct collocation scheme
-        scheme = cl.CollocationScheme(dae, pdq, NT)
+        scheme = cl.CollocationScheme(dae, pdq)
 
         # Optimization variable
         w = scheme.combine(['x', 'z', 'u'])
@@ -291,8 +288,8 @@ class IvpTest(unittest.TestCase):
         # Constraints
         g = ct.struct_MX([
             ct.entry('eq', expr=scheme.eq),
-            ct.entry('initial', expr=scheme.x0[:, 0]),     # q0 = 0, v0 = 0
-            ct.entry('final', expr=scheme.xf[:, -1] - np.array([1, 0]))   # qf = 1, vf = 0
+            ct.entry('initial', expr=scheme.x[:, 0]),     # q0 = 0, v0 = 0
+            ct.entry('final', expr=scheme.x[:, -1] - np.array([1, 0]))   # qf = 1, vf = 0
         ])
 
         # Make NLP
@@ -337,13 +334,13 @@ class IvpTest(unittest.TestCase):
         ts = 1  # time step
 
         # PDQ
-        pdq = cl.cheb(N, t0=0, tf=ts)
+        pdq = cl.Pdq(np.arange(NT + 1) * ts, poly_order=N)
         
         # DAE model
         dae = dae_model.Dae(x=x.cat, ode=ode.cat, u=u, quad=quad)
 
         # Create direct collocation scheme
-        scheme = cl.CollocationScheme(dae, pdq, NT)
+        scheme = cl.CollocationScheme(dae, pdq)
 
         # Optimization variable
         w = scheme.combine(['x', 'z', 'u'])
@@ -355,7 +352,7 @@ class IvpTest(unittest.TestCase):
         g = ct.struct_MX([
             ct.entry('eq', expr=scheme.eq),
             ct.entry('initial', expr=scheme.x0[:, 0]),     # q0 = 0, v0 = 0
-            ct.entry('final', expr=scheme.xf[:, -1] - np.array([1, 0]))   # qf = 1, vf = 0
+            ct.entry('final', expr=scheme.x[:, -1] - np.array([1, 0]))   # qf = 1, vf = 0
         ])
 
         # Make NLP
@@ -375,7 +372,7 @@ class IvpTest(unittest.TestCase):
         plt.plot(scheme.t, sol_w['x'].T, '.-')
         plt.hold(True)
 
-        fi = scheme.interpolator()
+        fi = pdq.interpolator()
         t = np.linspace(0, NT * ts, num=50)
         plt.plot(t, fi(sol_w['x'], t).T)
 
