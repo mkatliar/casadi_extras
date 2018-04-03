@@ -283,7 +283,7 @@ class IvpTest(unittest.TestCase):
         w = scheme.combine(['x', 'z', 'u'])
 
         # Objective
-        f = cs.sum2(scheme.qf)
+        f = scheme.q[:, -1]
 
         # Constraints
         g = ct.struct_MX([
@@ -346,7 +346,7 @@ class IvpTest(unittest.TestCase):
         w = scheme.combine(['x', 'z', 'u'])
 
         # Objective
-        f = cs.sum2(scheme.qf)
+        f = scheme.q[:, -1]
 
         # Constraints
         g = ct.struct_MX([

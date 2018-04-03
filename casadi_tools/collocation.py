@@ -118,6 +118,7 @@ class Pdq(object):
         """Calculate integral from derivative values
         """
 
+        y0 = cs.MX.zeros(dy.shape[0])
         y = []
         k = 0
         for D in self._D:
@@ -125,10 +126,11 @@ class Pdq(object):
 
             # Calculate y the equation 
             # dy = cs.mtimes(y[:, 1 :], D[: -1, 1 :].T)
-            #invD = cs.inv(pdq.D[: -1, 1 :])
-            #Qc = [cs.transpose(cs.mtimes(invD, cs.transpose(dae_out['quad'][:, k : k + N]))) for k in range(0, N * NT, N)]
-            y.append(cs.transpose(cs.solve(D[: -1, 1 :], cs.transpose(dy[:, k : k + N]))))
+            #invD = cs.inv(D[: -1, 1 :])
+            #y.append(cs.transpose(cs.mtimes(invD, cs.transpose(dy[:, k : k + N]))))
+            y.append(cs.transpose(cs.solve(D[: -1, 1 :], cs.transpose(dy[:, k : k + N]))) + cs.repmat(y0, 1, N))
             k += N
+            y0 = y[-1][:, -1]
 
         return cs.horzcat(*y)
 
@@ -160,7 +162,7 @@ class Pdq(object):
         def interp(x, t):
             l = []
             
-            for ti in t:
+            for ti in np.atleast_1d(t):
                 i = np.clip(np.searchsorted(self._intervalBounds, ti, 'right') - 1, 0, len(self._intervalBounds) - 2)  # interval index
                 l.append(fi_cl[i](x[:, groups[i]], ti))
 
@@ -311,12 +313,17 @@ class CollocationScheme(object):
         self._z = Zc
         self._u = U
         self._q = Qc
-        self._qf = Qc[:, np.arange(1, NT + 1) * pdq.polyOrder - 1]
         self._x0 = Xc[:, range(0, N - 1, pdq.polyOrder)]
         self._p = dae.p
         self._t = tc
         self._pdq = pdq
         self._tdp = tdp_val
+
+
+    @property
+    def pdq(self):
+        """PDQ used by the collocation scheme"""
+        return self._pdq
 
 
     @property
@@ -362,15 +369,6 @@ class CollocationScheme(object):
 
 
     @property
-    def qf(self):
-        """Quadrature state at the end of each control interval
-        
-        Depends on x, z, x0, p.
-        """
-        return self._qf
-
-
-    @property
     def x0(self):
         """State at the beginning of each control interval
         
@@ -391,10 +389,10 @@ class CollocationScheme(object):
     def combine(self, what):
         """Return a struct_MX combining the specified parts of the collocation scheme.
 
-        @param what is a list of strings with possible values 'x0', 'x', 'xf', 'z', 'u', 'p', 'eq', 'q', 'qf'.
+        @param what is a list of strings with possible values 'x0', 'x', 'z', 'u', 'p', 'eq', 'q'.
         """
 
-        what_set = ['x0', 'x', 'xf', 'z', 'u', 'p', 'eq', 'q', 'qf']
+        what_set = ['x0', 'x', 'z', 'u', 'p', 'eq', 'q']
         assert all([w in what_set for w in what])
 
         return ct.struct_MX([ct.entry(w, expr=getattr(self, w)) for w in what])
