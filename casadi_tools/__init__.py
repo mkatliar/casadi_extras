@@ -1,4 +1,4 @@
-from .collocation import CollocationScheme, cheb
+from .collocation import CollocationScheme, cheb, Pdq
 from .dae_model import Dae
 
 from .graph import *
