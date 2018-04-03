@@ -9,8 +9,8 @@ import numpy as np
 import casadi as cs
 import casadi_tools as ct
 
-import collocation as cl
-import dae_model
+import casadi_tools.collocation as cl
+from casadi_tools import dae_model
 
 import matplotlib.pyplot as plt
 
@@ -30,14 +30,14 @@ class PdqTest(unittest.TestCase):
             #return np.cos(10 * x) * np.exp(np.sin(10 * x))
 
 
-        pdq = cl.cheb(100, x0=-1, xf=1)
+        pdq = cl.cheb(100, t0=-1, tf=1)
 
-        y = f(pdq.x)
-        xx = np.linspace(pdq.x0, pdq.xf, 400)
+        y = f(pdq.t)
+        xx = np.linspace(pdq.t0, pdq.tf, 400)
         yy = f(xx)
 
-        fp = cl.polynomialInterpolator(pdq.x)
-        fb = cl.barycentricInterpolator(pdq.x)
+        fp = cl.polynomialInterpolator(pdq.t)
+        fb = cl.barycentricInterpolator(pdq.t)
         yp = fp(y, xx)
         yb = fb(y, xx)
         
@@ -74,16 +74,16 @@ class ChebTest(unittest.TestCase):
     """
 
     def test_0(self):
-        pdq = cl.cheb(0, x0=-1, xf=1)
+        pdq = cl.cheb(0, t0=-1, tf=1)
 
-        nptest.assert_allclose(pdq.x, np.array([1]))
+        nptest.assert_allclose(pdq.t, np.array([1]))
         nptest.assert_allclose(pdq.D, np.array([[0]]))
 
 
     def test_1(self):
-        pdq = cl.cheb(1, x0=-1, xf=1)
+        pdq = cl.cheb(1, t0=-1, tf=1)
 
-        nptest.assert_allclose(np.flip(pdq.x, 0), np.array([1, -1]))
+        nptest.assert_allclose(np.flip(pdq.t, 0), np.array([1, -1]))
         nptest.assert_allclose(np.rot90(pdq.D, 2), np.array([
             [0.5, -0.5],
             [0.5, -0.5]
@@ -91,7 +91,7 @@ class ChebTest(unittest.TestCase):
 
 
     def test_2(self):
-        pdq = cl.cheb(2, x0=-1, xf=1)
+        pdq = cl.cheb(2, t0=-1, tf=1)
 
         nptest.assert_allclose(np.rot90(pdq.D, 2), np.array([
             [1.5, -2, 0.5],
@@ -101,7 +101,7 @@ class ChebTest(unittest.TestCase):
 
 
     def test_3(self):
-        pdq = cl.cheb(3, x0=-1, xf=1)
+        pdq = cl.cheb(3, t0=-1, tf=1)
 
         #nptest.assert_almost_equal(x, np.array([1, -1]))
         nptest.assert_allclose(np.rot90(pdq.D, 2), np.array([
@@ -119,12 +119,12 @@ class DiffTest(unittest.TestCase):
         """Test differentiation using Chebyshev matrix
         """
         N = 20
-        pdq = cl.cheb(N, x0=0, xf=2)
+        pdq = cl.cheb(N, t0=0, tf=2)
         D = pdq.D
-        x = pdq.x
+        t = pdq.t
 
-        y = np.exp(x) * np.sin(5 * x)
-        nptest.assert_allclose(np.dot(D, y), y + np.exp(x) * np.cos(5 * x) * 5, atol=1e-8, rtol=0)
+        y = np.exp(t) * np.sin(5 * t)
+        nptest.assert_allclose(np.dot(D, y), y + np.exp(t) * np.cos(5 * t) * 5, atol=1e-8, rtol=0)
 
 
 class IvpTest(unittest.TestCase):
@@ -140,7 +140,7 @@ class IvpTest(unittest.TestCase):
 
         N = 10
         tf = 1
-        pdq = cl.cheb(N, x0=0, xf=tf)
+        pdq = cl.cheb(N, t0=0, tf=tf)
         D = pdq.D
 
         var = ct.struct_symMX([
@@ -169,12 +169,33 @@ class IvpTest(unittest.TestCase):
         tf = 1
         
         dae = dae_model.Dae(x=x, ode=xdot)
-        pdq = cl.cheb(N, x0=0, xf=tf)
+        pdq = cl.cheb(N, t0=0, tf=tf)
         
         integrator = cl.collocationIntegrator('integrator', dae, pdq)
         sol = integrator(x0=1)
 
         nptest.assert_allclose(sol['xf'], 1 * np.exp(1 * tf))
+
+
+    def test_collocation_integrator_ode_time_dependent(self):
+        """Test collocation_integrator function with time-dependent ODE
+        """
+        x = cs.MX.sym('x')
+        t = cs.MX.sym('t')
+        xdot = t ** 2
+
+        N = 10
+        x0 = 1.1
+        t0 = 2.4
+        tf = 3.9
+        
+        dae = dae_model.Dae(x=x, ode=xdot, t=t)
+        pdq = cl.cheb(N, t0=0, tf=tf - t0)
+        
+        integrator = cl.collocationIntegrator('integrator', dae, pdq, t0=t0)
+        sol = integrator(x0=x0)
+
+        nptest.assert_allclose(sol['xf'], x0 + tf ** 3 / 3 - t0 ** 3 / 3)
 
 
     def test_collocation_integrator_dae(self):
@@ -190,7 +211,7 @@ class IvpTest(unittest.TestCase):
         tf = 2
         
         dae = dae_model.Dae(x=x, z=z, u=u, ode=xdot, alg=alg)
-        pdq = cl.cheb(N, x0=0, xf=tf)
+        pdq = cl.cheb(N, t0=0, tf=tf)
         
         integrator = cl.collocationIntegrator('integrator', dae, pdq)
 
@@ -215,7 +236,7 @@ class IvpTest(unittest.TestCase):
         tf = 2
         
         dae = dae_model.Dae(x=x, z=z, ode=xdot, alg=alg, quad=q)
-        pdq = cl.cheb(N, x0=0, xf=tf)
+        pdq = cl.cheb(N, t0=0, tf=tf)
         
         integrator = cl.collocationIntegrator('integrator', dae, pdq)
 
@@ -253,7 +274,7 @@ class IvpTest(unittest.TestCase):
         ts = 1  # time step
 
         # PDQ
-        pdq = cl.cheb(N, x0=0, xf=ts)
+        pdq = cl.cheb(N, t0=0, tf=ts)
         
         # DAE model
         dae = dae_model.Dae(x=x.cat, ode=ode.cat, u=u, quad=quad)
@@ -262,7 +283,7 @@ class IvpTest(unittest.TestCase):
         scheme = cl.CollocationScheme(dae, pdq, NT)
 
         # Optimization variable
-        w = scheme.combine(['x0', 'x', 'z', 'u'])
+        w = scheme.combine(['x', 'z', 'u'])
 
         # Objective
         f = cs.sum2(scheme.qf)
@@ -291,7 +312,7 @@ class IvpTest(unittest.TestCase):
 
 
     def test_directCollocationReach(self):
-        """Test direct collocation on a s toy problem
+        """Test direct collocation on a toy problem
 
         The problem: bring the double integrator from state [0, 0] to state [1, 0]
         while minimizing L2 norm of the control input.
@@ -316,7 +337,7 @@ class IvpTest(unittest.TestCase):
         ts = 1  # time step
 
         # PDQ
-        pdq = cl.cheb(N, x0=0, xf=ts)
+        pdq = cl.cheb(N, t0=0, tf=ts)
         
         # DAE model
         dae = dae_model.Dae(x=x.cat, ode=ode.cat, u=u, quad=quad)
@@ -325,7 +346,7 @@ class IvpTest(unittest.TestCase):
         scheme = cl.CollocationScheme(dae, pdq, NT)
 
         # Optimization variable
-        w = scheme.combine(['x0', 'x', 'z', 'u'])
+        w = scheme.combine(['x', 'z', 'u'])
 
         # Objective
         f = cs.sum2(scheme.qf)
@@ -349,14 +370,14 @@ class IvpTest(unittest.TestCase):
         sol_w = w(sol['x'])
 
         # Check against the known solution
-        nptest.assert_allclose(sol_w['u'], [[0.2, 0.1, 0, -0.1, -0.2]], atol=1e-8)
+        nptest.assert_allclose(sol_w['u'], [[0.2, 0.1, 0, -0.1, -0.2]], atol=1e-16)
 
         plt.plot(scheme.t, sol_w['x'].T, '.-')
         plt.hold(True)
 
         fi = scheme.interpolator()
         t = np.linspace(0, NT * ts, num=50)
-        plt.plot(t, fi(sol_w['x0'], sol_w['x'], t).T)
+        plt.plot(t, fi(sol_w['x'], t).T)
 
         plt.show()
 

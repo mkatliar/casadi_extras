@@ -13,7 +13,7 @@ class Dae(object):
     def __init__(self, **kwargs):
         """Constructor
 
-        Dae(x, z, u, p, ode, alg)
+        Dae(x, z, u, p, ode, alg, quad, tdp)
         """
 
         x = kwargs['x']
@@ -73,18 +73,41 @@ class Dae(object):
         else:
             p = cs.MX.sym('p', 0)
 
+        if 't' in kwargs:
+            t = kwargs['t']
+
+            if not t.is_valid_input():
+                raise ValueError('t must be a valid input (purely symbolic)')
+
+            if not t.is_scalar():
+                raise ValueError('t must be scalar')
+
+        else:
+            t = cs.MX.sym('t')
+
         if 'quad' in kwargs:
             quad = kwargs['quad']
         else:
             quad = cs.MX.sym('quad', 0)
 
+        if 'tdp' in kwargs:
+            tdp = kwargs['tdp']
+
+            if not tdp.is_valid_input():
+                raise ValueError('tdp must be a valid input (purely symbolic)')
+
+        else:
+            tdp = cs.MX.sym('tdp', 0)
+
         self._x = x
         self._z = z
         self._u = u
         self._p = p
+        self._t = t
         self._ode = ode
         self._alg = alg
         self._quad = quad
+        self._tdp = tdp
 
 
     '''
@@ -126,6 +149,11 @@ class Dae(object):
     @property
     def p(self):
         return self._p
+
+
+    @property
+    def t(self):
+        return self._t
 
 
     @property
@@ -141,6 +169,11 @@ class Dae(object):
     @property
     def quad(self):
         return self._quad
+
+
+    @property
+    def tdp(self):
+        return self._tdp
 
 
     @property
@@ -163,6 +196,11 @@ class Dae(object):
         return self._p.numel()
 
 
+    @property
+    def ntdp(self):
+        return self._tdp.numel()
+
+
     def createFunction(self, name, in_arg, out_arg):
         return cs.Function(name, [self._get(n) for n in in_arg], [self._get(n) for n in out_arg], in_arg, out_arg)
 
@@ -176,7 +214,7 @@ def parallel(models):
     '''
     
     d = {}
-    for attr in ['x', 'z', 'u', 'p', 'ode', 'alg', 'quad']:
+    for attr in ['x', 'z', 'u', 'p', 'ode', 'alg', 'quad']: # TODO: what do we do with t?
         d[attr] = ct.struct_MX([ct.entry('model_{0}'.format(i), expr=getattr(m, attr)) for i, m in enumerate(models)])
 
     return Dae(**d)
