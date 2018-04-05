@@ -253,7 +253,7 @@ class CollocationScheme(object):
     for a given DAE model and differentiation matrix.
     """
 
-    def __init__(self, dae, pdq, parallelization='serial', tdp_fun=None, expand=True):
+    def __init__(self, dae, pdq, parallelization='serial', tdp_fun=None, expand=True, repeat_param=False):
         """Constructor
 
         @param pdq Pdq object
@@ -294,13 +294,21 @@ class CollocationScheme(object):
         if expand:
             dae_fun = dae_fun.expand()  # expand() for speed
 
-        dae_map = dae_fun.map('dae_map', parallelization, N - 1, [3], [])
-        dae_out = dae_map(x=Xc[:, : -1], z=Zc, u=Uc, p=dae.p, t=tc[: -1], tdp=tdp_val[:, : -1])
+        if repeat_param:
+            reduce_in = []
+            p = cs.MX.sym('P', dae.np, N - 1)
+        else:
+            reduce_in = [3]
+            p = cs.MX.sym('P', dae.np)
 
-        eqc = ct.struct_MX([
-            ct.entry('eqc_ode', expr=dae_out['ode'] - pdq.derivative(Xc)),
-            ct.entry('eqc_alg', expr=dae_out['alg'])
-        ])
+        dae_map = dae_fun.map('dae_map', parallelization, N - 1, reduce_in, [])
+        dae_out = dae_map(x=Xc[:, : -1], z=Zc, u=Uc, p=p, t=tc[: -1], tdp=tdp_val[:, : -1])
+
+        eqc = [
+            cs.vec(dae_out['ode'] - pdq.derivative(Xc)),
+            cs.vec(dae_out['alg']),
+            cs.vec(cs.diff(p, 1, 1))
+        ]
 
         # Calculate the quadrature
         Qc = pdq.integral(dae_out['quad'])
@@ -308,13 +316,13 @@ class CollocationScheme(object):
         self._N = N
         self._NT = NT
 
-        self._eq = eqc.cat
+        self._eq = cs.vertcat(*eqc)
         self._x = Xc
         self._z = Zc
         self._u = U
         self._q = Qc
         self._x0 = Xc[:, range(0, N - 1, pdq.polyOrder)]
-        self._p = dae.p
+        self._p = p
         self._t = tc
         self._pdq = pdq
         self._tdp = tdp_val
