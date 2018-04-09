@@ -155,7 +155,7 @@ class Pdq(object):
             elif continuity == 'right':
                 groups.append(g[: -1])
             else:
-                raise ValueError('Invalid "continuity" value {0} in Dae.interpolator()'.format(continuity))
+                raise ValueError('Invalid "continuity" value {0} in Pdq.interpolator()'.format(continuity))
 
         fi_cl = [barycentricInterpolator(self._collocationPoints[g]) for g in groups]
 
@@ -257,7 +257,7 @@ class CollocationScheme(object):
         """Constructor
 
         @param pdq Pdq object
-        @param dae Dae model
+        @param dae DAE model
         @param parallelization parallelization of the outer map. Possible set of values is the same as for casadi.Function.map().
 
         @return Returns a dictionary with the following keys:
@@ -267,6 +267,9 @@ class CollocationScheme(object):
         'eq' -- the expression eq == 0 defines the collocation equation. eq depends on X, Z, x0, p.
         'Q' -- quadrature values at collocation points depending on x0, X, Z, p.
         """
+
+        # Convert whatever DAE to implicit DAE
+        dae = dae.makeImplicit()
 
         N = len(pdq.collocationPoints)
         NT = len(pdq.intervalBounds) - 1
@@ -290,7 +293,7 @@ class CollocationScheme(object):
             tdp_val = np.zeros((0, N))
 
         # DAE function
-        dae_fun = dae.createFunction('dae', ['x', 'z', 'u', 'p', 't', 'tdp'], ['ode', 'alg', 'quad'])
+        dae_fun = dae.createFunction('dae', ['xdot', 'x', 'z', 'u', 'p', 't', 'tdp'], ['dae', 'quad'])
         if expand:
             dae_fun = dae_fun.expand()  # expand() for speed
 
@@ -298,15 +301,14 @@ class CollocationScheme(object):
             reduce_in = []
             p = cs.MX.sym('P', dae.np, N - 1)
         else:
-            reduce_in = [3]
+            reduce_in = [4]
             p = cs.MX.sym('P', dae.np)
 
         dae_map = dae_fun.map('dae_map', parallelization, N - 1, reduce_in, [])
-        dae_out = dae_map(x=Xc[:, : -1], z=Zc, u=Uc, p=p, t=tc[: -1], tdp=tdp_val[:, : -1])
+        dae_out = dae_map(xdot=pdq.derivative(Xc), x=Xc[:, : -1], z=Zc, u=Uc, p=p, t=tc[: -1], tdp=tdp_val[:, : -1])
 
         eqc = [
-            cs.vec(dae_out['ode'] - pdq.derivative(Xc)),
-            cs.vec(dae_out['alg']),
+            cs.vec(dae_out['dae']),
             cs.vec(cs.diff(p, 1, 1))
         ]
 

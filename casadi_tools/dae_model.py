@@ -13,45 +13,27 @@ class Dae(object):
     def __init__(self, **kwargs):
         """Constructor
 
-        Dae(x, z, u, p, ode, alg, quad, tdp)
+        Dae(x, z, u, p, t, quad, tdp)
         """
 
         x = kwargs['x']
-        ode = kwargs['ode']
-
+        
         if not x.is_column():
             raise ValueError('x must be a column vector')
 
         if not x.is_valid_input():
             raise ValueError('x must be a valid input (purely symbolic)')
 
-        if not ode.is_column():
-            raise ValueError('ode must be a column vector')
-
-        if x.numel() != ode.numel():
-            raise ValueError('x and ode must have the same number of elements')
-
-        if ('z' in kwargs) != ('alg' in kwargs):
-            raise ValueError('if z is specified, then alg must be specified, and vice versa')
-
         if 'z' in kwargs:
             z = kwargs['z']
-            alg = kwargs['alg']
 
             if not z.is_column():
                 raise ValueError('z must be a column vector')
 
             if not z.is_valid_input():
                 raise ValueError('z must be a valid input (purely symbolic)')
-
-            if not alg.is_column():
-                raise ValueError('alg must be a column vector')
-
-            if z.numel() != alg.numel():
-                raise ValueError('z and alg must have the same number of elements')
         else:
             z = cs.MX.sym('z', 0)
-            alg = cs.MX.sym('alg', 0)
 
         if 'u' in kwargs:
             u = kwargs['u']
@@ -104,32 +86,9 @@ class Dae(object):
         self._u = u
         self._p = p
         self._t = t
-        self._ode = ode
-        self._alg = alg
         self._quad = quad
         self._tdp = tdp
 
-
-    '''
-    @property
-    def x(self):
-        return self._x
-
-
-    @property
-    def z(self):
-        return self._z
-
-
-    @property
-    def u(self):
-        return self._u
-
-
-    @property
-    def p(self):
-        return self._p
-    '''
 
     @property
     def x(self):
@@ -154,16 +113,6 @@ class Dae(object):
     @property
     def t(self):
         return self._t
-
-
-    @property
-    def ode(self):
-        return self._ode
-
-
-    @property
-    def alg(self):
-        return self._alg
 
 
     @property
@@ -207,6 +156,106 @@ class Dae(object):
 
     def _get(self, name):
         return getattr(self, '_' + name)
+
+
+class SemiExplicitDae(Dae):
+    '''Semi-explicit DAE
+    '''
+
+    def __init__(self, **kwargs):
+        """Constructor
+
+        SemiExplicitDae(x, z, u, p, t, ode, alg, quad, tdp)
+        """
+
+        super().__init__(**kwargs)
+
+        ode = kwargs['ode']
+        if not ode.is_column():
+            raise ValueError('ode must be a column vector')
+
+        if self.x.numel() != ode.numel():
+            raise ValueError('x and ode must have the same number of elements')
+
+        if 'alg' in kwargs:
+            alg = kwargs['alg']
+
+            if not alg.is_column():
+                raise ValueError('alg must be a column vector')
+
+            if self.z.numel() != alg.numel():
+                raise ValueError('z and alg must have the same number of elements')
+        else:
+            alg = cs.MX.sym('alg', 0)
+
+        self._ode = ode
+        self._alg = alg
+
+
+    @property
+    def ode(self):
+        return self._ode
+
+
+    @property
+    def alg(self):
+        return self._alg
+
+
+    def makeImplicit(self):
+        '''Convert to implicit DAE
+        '''
+        xdot = cs.MX.sym('xdot', self.nx)
+
+        return ImplicitDae(xdot=xdot, x=self.x, z=self.z, u=self.u, p=self.p, t=self.t,
+            dae=cs.vertcat(xdot - self.ode, self.alg), quad=self.quad, tdp=self.tdp)
+
+
+class ImplicitDae(Dae):
+    '''Implicit DAE
+    '''
+
+    def __init__(self, **kwargs):
+        """Constructor
+
+        ImplicitDae(xdot, x, z, u, p, t, dae, quad, tdp)
+        """
+
+        super().__init__(**kwargs)
+
+        xdot = kwargs['xdot']
+        if not xdot.is_column():
+            raise ValueError('xdot must be a column vector')
+
+        if self.x.numel() != xdot.numel():
+            raise ValueError('x and xdot must have the same number of elements')
+
+        dae = kwargs['dae']
+
+        if not dae.is_column():
+            raise ValueError('dae must be a column vector')
+
+        if self.z.numel() + xdot.numel() != dae.numel():
+            raise ValueError('The size in dae must be equal to size of x + size of z')
+
+        self._xdot = xdot
+        self._dae = dae
+
+
+    @property
+    def xdot(self):
+        return self._xdot
+
+
+    @property
+    def dae(self):
+        return self._dae
+
+
+    def makeImplicit(self):
+        '''Convert to implicit DAE
+        '''
+        return self
 
 
 def parallel(models):

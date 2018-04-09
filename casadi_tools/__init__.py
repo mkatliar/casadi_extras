@@ -1,6 +1,6 @@
 from .collocation import CollocationScheme, cheb, Pdq
 from .system_trajectory import SystemTrajectory
-from .dae_model import Dae
+from .dae_model import SemiExplicitDae, ImplicitDae
 
 from .graph import *
 from .bounds import *

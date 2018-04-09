@@ -165,7 +165,7 @@ class IvpTest(unittest.TestCase):
         N = 10
         tf = 1
         
-        dae = dae_model.Dae(x=x, ode=xdot)
+        dae = dae_model.SemiExplicitDae(x=x, ode=xdot)
         pdq = cl.Pdq([0, tf], poly_order=N)
         
         integrator = cl.collocationIntegrator('integrator', dae, pdq)
@@ -186,7 +186,7 @@ class IvpTest(unittest.TestCase):
         t0 = 2.4
         tf = 3.9
         
-        dae = dae_model.Dae(x=x, ode=xdot, t=t)
+        dae = dae_model.SemiExplicitDae(x=x, ode=xdot, t=t)
         pdq = cl.Pdq([t0, tf], poly_order=N)
         
         integrator = cl.collocationIntegrator('integrator', dae, pdq)
@@ -207,7 +207,7 @@ class IvpTest(unittest.TestCase):
         N = 10
         tf = 2
         
-        dae = dae_model.Dae(x=x, z=z, u=u, ode=xdot, alg=alg)
+        dae = dae_model.SemiExplicitDae(x=x, z=z, u=u, ode=xdot, alg=alg)
         pdq = cl.Pdq([0, tf], poly_order=N)
         
         integrator = cl.collocationIntegrator('integrator', dae, pdq)
@@ -232,7 +232,7 @@ class IvpTest(unittest.TestCase):
         N = 10
         tf = 2
         
-        dae = dae_model.Dae(x=x, z=z, ode=xdot, alg=alg, quad=q)
+        dae = dae_model.SemiExplicitDae(x=x, z=z, ode=xdot, alg=alg, quad=q)
         pdq = cl.Pdq([0, tf], poly_order=N)
         
         integrator = cl.collocationIntegrator('integrator', dae, pdq)
@@ -274,7 +274,7 @@ class IvpTest(unittest.TestCase):
         pdq = cl.Pdq(np.arange(NT + 1) * ts, poly_order=N)
         
         # DAE model
-        dae = dae_model.Dae(x=x.cat, ode=ode.cat, u=u, quad=quad)
+        dae = dae_model.SemiExplicitDae(x=x.cat, ode=ode.cat, u=u, quad=quad)
 
         # Create direct collocation scheme
         scheme = cl.CollocationScheme(dae, pdq)
@@ -337,7 +337,7 @@ class IvpTest(unittest.TestCase):
         pdq = cl.Pdq(np.arange(NT + 1) * ts, poly_order=N)
         
         # DAE model
-        dae = dae_model.Dae(x=x.cat, ode=ode.cat, u=u, quad=quad)
+        dae = dae_model.SemiExplicitDae(x=x.cat, ode=ode.cat, u=u, quad=quad)
 
         # Create direct collocation scheme
         scheme = cl.CollocationScheme(dae, pdq)
