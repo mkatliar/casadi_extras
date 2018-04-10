@@ -322,6 +322,7 @@ class CollocationScheme(object):
         self._x = Xc
         self._z = Zc
         self._u = U
+        self._uc = Uc
         self._q = Qc
         self._x0 = Xc[:, range(0, N - 1, pdq.polyOrder)]
         self._p = p
@@ -364,6 +365,12 @@ class CollocationScheme(object):
     def u(self):
         """Control input on control intervals"""
         return self._u
+
+
+    @property
+    def uc(self):
+        """Control input at collocation points"""
+        return self._uc
 
 
     @property
