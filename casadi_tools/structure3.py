@@ -482,6 +482,17 @@ class CasadiStructureDerivable:
     return (a,mtype)
 
   def __call__(self,arg=0):
+    if isinstance(arg, dict):
+      # Assign fields from a dict
+      if set(arg.keys()) != set(self.keys()):
+        raise Exception("The set of keys in the argument must exactly match the set of keys in the CasADi struct")
+
+      ret = DMStruct(self)
+      for k in self.keys():
+        ret[k] = arg[k]
+
+      return ret
+
     (a,mtype) = self.argtype(arg)
 
     if isinstance(a,DM):
