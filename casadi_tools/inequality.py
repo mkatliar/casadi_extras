@@ -14,9 +14,12 @@ class Inequality(namedtuple('Inequality', ['expr', 'lb', 'ub', 'nominal'])):
 
         lb = -cs.DM.inf(expr.shape) if lb is None else cs.DM(lb)
         ub = cs.DM.inf(expr.shape) if ub is None else cs.DM(ub)
+        
+        assert lb.shape == expr.shape and ub.shape == expr.shape
 
-        assert lb.shape == expr.shape and ub.shape == expr.shape \
-            and (nominal is None or nominal.shape == expr.shape)
+        if nominal is not None:
+            nominal = cs.DM(nominal)
+            assert nominal.shape == expr.shape
 
         return super().__new__(cls, expr, lb, ub, nominal)
 
