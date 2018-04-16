@@ -62,12 +62,6 @@ class Pdq(object):
 
 
     @property
-    def D(self):
-        """Differentiation matrix"""
-        return self._D
-
-
-    @property
     def collocationPoints(self):
         """Collocation points"""
         return self._collocationPoints
@@ -124,6 +118,7 @@ class Pdq(object):
         """Calculate integral from derivative values
         """
 
+        y0 = cs.MX.zeros(dy.shape[0])
         y = []
         k = 0
         for D in self._D:
@@ -131,26 +126,45 @@ class Pdq(object):
 
             # Calculate y the equation 
             # dy = cs.mtimes(y[:, 1 :], D[: -1, 1 :].T)
-            #invD = cs.inv(pdq.D[: -1, 1 :])
-            #Qc = [cs.transpose(cs.mtimes(invD, cs.transpose(dae_out['quad'][:, k : k + N]))) for k in range(0, N * NT, N)]
-            y.append(cs.transpose(cs.solve(D[: -1, 1 :], cs.transpose(dy[:, k : k + N]))))
+            #invD = cs.inv(D[: -1, 1 :])
+            #y.append(cs.transpose(cs.mtimes(invD, cs.transpose(dy[:, k : k + N]))))
+            y.append(cs.transpose(cs.solve(D[: -1, 1 :], cs.transpose(dy[:, k : k + N]))) + cs.repmat(y0, 1, N))
             k += N
+            y0 = y[-1][:, -1]
 
         return cs.horzcat(*y)
 
 
-    def interpolator(self):
+    def interpolator(self, continuity='both'):
         """Create interpolating function based on values at collocation points
+
+        @param specifies continuity of the interpolated function at the interval boundaries:
+        - 'left' means that the function in continuous from the left,
+        - 'right' means that the function in continuous from the right,
+        - 'both' means that the function is continuous both from the left and from the right.
         """
 
-        fi_cl = [barycentricInterpolator(self._collocationPoints[g]) for g in self._collocationGroups]
+        # Transform collocation groups depending on the continuity option.
+        groups = []
+
+        for g in self._collocationGroups:
+            if continuity == 'both':
+                groups.append(g)
+            elif continuity == 'left':
+                groups.append(g[1 : ])
+            elif continuity == 'right':
+                groups.append(g[: -1])
+            else:
+                raise ValueError('Invalid "continuity" value {0} in Pdq.interpolator()'.format(continuity))
+
+        fi_cl = [barycentricInterpolator(self._collocationPoints[g]) for g in groups]
 
         def interp(x, t):
             l = []
             
-            for ti in t:
+            for ti in np.atleast_1d(t):
                 i = np.clip(np.searchsorted(self._intervalBounds, ti, 'right') - 1, 0, len(self._intervalBounds) - 2)  # interval index
-                l.append(fi_cl[i](x[:, self._collocationGroups[i]], ti))
+                l.append(fi_cl[i](x[:, groups[i]], ti))
 
             return np.hstack(l)
 
@@ -239,11 +253,11 @@ class CollocationScheme(object):
     for a given DAE model and differentiation matrix.
     """
 
-    def __init__(self, dae, pdq, parallelization='serial', tdp_fun=None, expand=True):
+    def __init__(self, dae, pdq, parallelization='serial', tdp_fun=None, expand=True, repeat_param=False):
         """Constructor
 
         @param pdq Pdq object
-        @param dae Dae model
+        @param dae DAE model
         @param parallelization parallelization of the outer map. Possible set of values is the same as for casadi.Function.map().
 
         @return Returns a dictionary with the following keys:
@@ -253,6 +267,9 @@ class CollocationScheme(object):
         'eq' -- the expression eq == 0 defines the collocation equation. eq depends on X, Z, x0, p.
         'Q' -- quadrature values at collocation points depending on x0, X, Z, p.
         """
+
+        # Convert whatever DAE to implicit DAE
+        dae = dae.makeImplicit()
 
         N = len(pdq.collocationPoints)
         NT = len(pdq.intervalBounds) - 1
@@ -276,17 +293,24 @@ class CollocationScheme(object):
             tdp_val = np.zeros((0, N))
 
         # DAE function
-        dae_fun = dae.createFunction('dae', ['x', 'z', 'u', 'p', 't', 'tdp'], ['ode', 'alg', 'quad'])
+        dae_fun = dae.createFunction('dae', ['xdot', 'x', 'z', 'u', 'p', 't', 'tdp'], ['dae', 'quad'])
         if expand:
             dae_fun = dae_fun.expand()  # expand() for speed
 
-        dae_map = dae_fun.map('dae_map', parallelization, N - 1, [3], [])
-        dae_out = dae_map(x=Xc[:, : -1], z=Zc, u=Uc, p=dae.p, t=tc[: -1], tdp=tdp_val[:, : -1])
+        if repeat_param:
+            reduce_in = []
+            p = cs.MX.sym('P', dae.np, N - 1)
+        else:
+            reduce_in = [4]
+            p = cs.MX.sym('P', dae.np)
 
-        eqc = ct.struct_MX([
-            ct.entry('eqc_ode', expr=dae_out['ode'] - pdq.derivative(Xc)),
-            ct.entry('eqc_alg', expr=dae_out['alg'])
-        ])
+        dae_map = dae_fun.map('dae_map', parallelization, N - 1, reduce_in, [])
+        dae_out = dae_map(xdot=pdq.derivative(Xc), x=Xc[:, : -1], z=Zc, u=Uc, p=p, t=tc[: -1], tdp=tdp_val[:, : -1])
+
+        eqc = [
+            cs.vec(dae_out['dae']),
+            cs.vec(cs.diff(p, 1, 1))
+        ]
 
         # Calculate the quadrature
         Qc = pdq.integral(dae_out['quad'])
@@ -294,17 +318,23 @@ class CollocationScheme(object):
         self._N = N
         self._NT = NT
 
-        self._eq = eqc.cat
+        self._eq = cs.vertcat(*eqc)
         self._x = Xc
         self._z = Zc
         self._u = U
+        self._uc = Uc
         self._q = Qc
-        self._qf = Qc[:, np.arange(1, NT + 1) * pdq.polyOrder - 1]
         self._x0 = Xc[:, range(0, N - 1, pdq.polyOrder)]
-        self._p = dae.p
+        self._p = p
         self._t = tc
         self._pdq = pdq
         self._tdp = tdp_val
+
+
+    @property
+    def pdq(self):
+        """PDQ used by the collocation scheme"""
+        return self._pdq
 
 
     @property
@@ -338,6 +368,12 @@ class CollocationScheme(object):
 
 
     @property
+    def uc(self):
+        """Control input at collocation points"""
+        return self._uc
+
+
+    @property
     def p(self):
         """DAE model parameters"""
         return self._p
@@ -347,15 +383,6 @@ class CollocationScheme(object):
     def q(self):
         """Quadrature state at collocation points"""
         return self._q
-
-
-    @property
-    def qf(self):
-        """Quadrature state at the end of each control interval
-        
-        Depends on x, z, x0, p.
-        """
-        return self._qf
 
 
     @property
@@ -379,10 +406,10 @@ class CollocationScheme(object):
     def combine(self, what):
         """Return a struct_MX combining the specified parts of the collocation scheme.
 
-        @param what is a list of strings with possible values 'x0', 'x', 'xf', 'z', 'u', 'p', 'eq', 'q', 'qf'.
+        @param what is a list of strings with possible values 'x0', 'x', 'z', 'u', 'p', 'eq', 'q'.
         """
 
-        what_set = ['x0', 'x', 'xf', 'z', 'u', 'p', 'eq', 'q', 'qf']
+        what_set = ['x0', 'x', 'z', 'u', 'p', 'eq', 'q']
         assert all([w in what_set for w in what])
 
         return ct.struct_MX([ct.entry(w, expr=getattr(self, w)) for w in what])
