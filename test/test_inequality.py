@@ -63,6 +63,13 @@ class InequalityTest(unittest.TestCase):
         self.assertEqual(i.numel(), 3)
 
 
+    def test_empty(self):
+        '''Test empty Inequality
+        '''
+        i = ct.Inequality()
+        self.assertEqual(i.numel(), 0)
+
+
 class BoundedVariableTest(unittest.TestCase):
     """
     Tests for BoundedVariable class

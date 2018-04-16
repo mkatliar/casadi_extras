@@ -1082,6 +1082,9 @@ class MXStruct(MatrixStruct,VertsplitStructure):
   def __MX__(self):
     return self.cat
 
+  def numel(self):
+    return self.size
+
 class MXVeccatStruct(CasadiStructured,MasterGettable):
   description = "Partially mutable MX"
   def __init__(self,arg,order=None):

@@ -7,7 +7,7 @@ class Inequality(namedtuple('Inequality', ['expr', 'lb', 'ub', 'nominal'])):
     '''Inequality of a form lb <= expr <= ub.
     '''
 
-    def __new__(cls, expr=cs.MX.sym('empty'), lb=None, ub=None, nominal=None):
+    def __new__(cls, expr=cs.MX.sym('empty', 0), lb=None, ub=None, nominal=None):
         '''Constructor
 
         '''
