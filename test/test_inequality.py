@@ -70,6 +70,50 @@ class InequalityTest(unittest.TestCase):
         self.assertEqual(i.numel(), 0)
 
 
+    def test_vertcat_list(self):
+        '''Test Inequality vertical concatenation as a list
+        '''
+        b1 = np.random.rand(3, 2)
+        n1 = np.random.rand(3)
+        i1 = ct.Inequality(cs.MX.sym('x', 3), lb=np.min(b1, axis=1), ub=np.max(b1, axis=1), nominal=n1)
+
+        b2 = np.random.rand(4, 2)
+        n2 = np.random.rand(4)
+        i2 = ct.Inequality(cs.MX.sym('y', 4), lb=np.min(b2, axis=1), ub=np.max(b2, axis=1), nominal=n2)
+
+        i3 = ct.inequality.vertcat([i1, i2])
+
+        self.assertEqual(i3.numel(), 7)
+        nptest.assert_equal(np.array(i3.lb), np.array(cs.vertcat(i1.lb, i2.lb)))
+        nptest.assert_equal(np.array(i3.ub), np.array(cs.vertcat(i1.ub, i2.ub)))
+        nptest.assert_equal(np.array(i3.nominal), np.array(cs.vertcat(i1.nominal, i2.nominal)))
+
+
+    def test_vertcat_dict(self):
+        '''Test Inequality vertical concatenation as a dict
+        '''
+        b1 = np.random.rand(3, 2)
+        n1 = np.random.rand(3)
+        i1 = ct.Inequality(cs.MX.sym('x', 3), lb=np.min(b1, axis=1), ub=np.max(b1, axis=1), nominal=n1)
+
+        b2 = np.random.rand(4, 2)
+        n2 = np.random.rand(4)
+        i2 = ct.Inequality(cs.MX.sym('y', 4), lb=np.min(b2, axis=1), ub=np.max(b2, axis=1), nominal=n2)
+
+        i3 = ct.inequality.vertcat({'i1': i1, 'i2': i2})
+
+        self.assertEqual(i3.numel(), 7)
+        nptest.assert_equal(np.array(i3.lb.cat), np.array(cs.vertcat(i1.lb, i2.lb)))
+        nptest.assert_equal(np.array(i3.ub.cat), np.array(cs.vertcat(i1.ub, i2.ub)))
+        nptest.assert_equal(np.array(i3.nominal.cat), np.array(cs.vertcat(i1.nominal, i2.nominal)))
+        
+        nptest.assert_equal(np.array(i3.lb['i1']), np.array(i1.lb))
+        nptest.assert_equal(np.array(i3.ub['i1']), np.array(i1.ub))
+        nptest.assert_equal(np.array(i3.lb['i2']), np.array(i2.lb))
+        nptest.assert_equal(np.array(i3.ub['i2']), np.array(i2.ub))
+        nptest.assert_equal(np.array(i3.nominal['i2']), np.array(i2.nominal))
+
+
 class BoundedVariableTest(unittest.TestCase):
     """
     Tests for BoundedVariable class
