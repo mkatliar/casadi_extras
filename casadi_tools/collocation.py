@@ -60,6 +60,19 @@ class Pdq(object):
         self._intervalBounds = t
         self._polyOrder = poly_order
 
+        # Big sparse differentiation matrix
+        N = len(collocation_points)
+        bigD = cs.DM(N, N)
+
+        i = 0
+        for d_k in D:
+            bigD[i : i + d_k.shape[0] - 1, i : i + d_k.shape[1]] = d_k[: -1, :]
+            i += d_k.shape[0] - 1
+
+        bigD[-1, -d_k.shape[1] :] = d_k[-1, :]
+
+        self._bigD = bigD
+
 
     @property
     def collocationPoints(self):
@@ -103,15 +116,7 @@ class Pdq(object):
         """Calculate derivative from function values
         """
 
-        dy = []
-        k = 0
-
-        for D in self._D:
-            N = D.shape[0] - 1
-            dy.append(cs.mtimes(y[:, k : k + N + 1], D[: -1, :].T))
-            k += N
-
-        return cs.horzcat(*dy)
+        return cs.mtimes(y, self._bigD[: -1, :].T)
 
 
     def integral(self, dy):
@@ -305,7 +310,9 @@ class CollocationScheme(object):
             p = cs.MX.sym('P', dae.np)
 
         dae_map = dae_fun.map('dae_map', parallelization, N - 1, reduce_in, [])
-        dae_out = dae_map(xdot=pdq.derivative(Xc), x=Xc[:, : -1], z=Zc, u=Uc, p=p, t=tc[: -1], tdp=tdp_val[:, : -1])
+
+        xdot = pdq.derivative(Xc)
+        dae_out = dae_map(xdot=xdot, x=Xc[:, : -1], z=Zc, u=Uc, p=p, t=tc[: -1], tdp=tdp_val[:, : -1])
 
         eqc = [
             cs.vec(dae_out['dae']),
@@ -320,6 +327,7 @@ class CollocationScheme(object):
 
         self._eq = cs.vertcat(*eqc)
         self._x = Xc
+        self._xdot = xdot
         self._z = Zc
         self._u = U
         self._uc = Uc
@@ -353,6 +361,12 @@ class CollocationScheme(object):
     def x(self):
         """State at collocation points"""
         return self._x
+
+
+    @property
+    def xdot(self):
+        """State derivative at collocation points"""
+        return self._xdot
 
 
     @property
