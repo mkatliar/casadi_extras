@@ -68,43 +68,59 @@ class PdqTest(unittest.TestCase):
         np.testing.assert_allclose(yb, yy, atol=1e-8)
 
 
+    def test_expandInput(self):
+        pdq = cl.Pdq(t=[0, 1, 2], poly_order=2)
+
+        u = cs.DM([
+            [1, 2],
+            [3, 4]
+        ])
+
+        nptest.assert_equal(np.array(pdq.expandInput(u)),
+            cs.DM([
+                [1, 1, 2, 2],
+                [3, 3, 4, 4]
+            ])
+        )
+
+
 class ChebTest(unittest.TestCase):
     """
     Test for the cheb function
     """
 
     def test_0(self):
-        D, t = cl.cheb(0, t0=-1, tf=1)
+        D, t = cl.cheb(0, t0=1, tf=-1)
 
         nptest.assert_allclose(t, np.array([1]))
         nptest.assert_allclose(D, np.array([[0]]))
 
 
     def test_1(self):
-        D, t = cl.cheb(1, t0=-1, tf=1)
+        D, t = cl.cheb(1, t0=1, tf=-1)
 
-        nptest.assert_allclose(np.flip(t, 0), np.array([1, -1]))
-        nptest.assert_allclose(np.rot90(D, 2), np.array([
+        nptest.assert_allclose(t, np.array([1, -1]))
+        nptest.assert_allclose(D, np.array([
             [0.5, -0.5],
             [0.5, -0.5]
         ]))
 
 
     def test_2(self):
-        D, _ = cl.cheb(2, t0=-1, tf=1)
+        D, _ = cl.cheb(2, t0=1, tf=-1)
 
-        nptest.assert_allclose(np.rot90(D, 2), np.array([
+        nptest.assert_allclose(D, np.array([
             [1.5, -2, 0.5],
             [0.5, 0, -0.5],
             [-0.5, 2, -1.5]
-        ]))
+        ]), atol=1e-10)
 
 
     def test_3(self):
-        D, _ = cl.cheb(3, t0=-1, tf=1)
+        D, _ = cl.cheb(3, t0=1, tf=-1)
 
         #nptest.assert_almost_equal(x, np.array([1, -1]))
-        nptest.assert_allclose(np.rot90(D, 2), np.array([
+        nptest.assert_allclose(D, np.array([
             [3.1667, -4.0000, 1.3333, -0.5000],
             [1.0000, -0.3333, -1.0000, 0.3333],
             [-0.3333, 1.0000, 0.3333, -1.0000],
@@ -155,6 +171,10 @@ class IvpTest(unittest.TestCase):
         sol = var(rf(var(0), 1))
         nptest.assert_allclose(sol['X', :, -1], 1 * np.exp(1 * tf))
 
+
+class CollocationIntegratorTest(unittest.TestCase):
+    '''Unit tests for collocation integrator.
+    '''
 
     def test_collocation_integrator_ode(self):
         """Test collocation_integrator function with ODE
@@ -247,6 +267,10 @@ class IvpTest(unittest.TestCase):
             nptest.assert_allclose(sol['qf'], ((1 + c)**3 - (-1 + c)**3) / 12)
             #nptest.assert_allclose(sol['xf'], (tf**2 + sign * 4 * tf * np.sqrt(x0) + 4 * x0) / 4)
 
+
+class CollocationSchemeTest(unittest.TestCase):
+    '''Tests for CollocationScheme.
+    '''
 
     def test_directCollocationSimple(self):
         """Test direct collocation on a very simple model
@@ -377,6 +401,31 @@ class IvpTest(unittest.TestCase):
         plt.plot(t, fi(sol_w['x'], t).T)
 
         plt.show()
+
+
+"""
+class CollocationSimulatorTest(unittest.TestCase):
+    '''Tests for CollocationSimulator.
+    '''
+
+    def test_simulate(self):
+        '''Check if CollocationSimulator.simulate() works.
+        '''
+
+        x = cs.MX.sym('x')
+        u = cs.MX.sym('u')
+        xdot = x * u
+
+        dae = dae_model.SemiExplicitDae(x=x, u=u, ode=xdot)        
+        simulator = cl.CollocationSimulator(dae, t=[0, 1, 2], poly_order=5)
+
+        def input(t):
+            return 1 if t < 1 else -1
+        
+        sol = simulator.simulate(x0=1, input=input)
+
+        #nptest.assert_allclose(sol['xf'], 1 * np.exp(1 * tf))
+"""
 
 
 if __name__ == '__main__':

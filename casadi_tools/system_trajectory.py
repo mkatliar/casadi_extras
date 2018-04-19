@@ -20,13 +20,14 @@ class SystemTrajectory:
         
         assert x.shape[1] == n_collocation
         assert z.shape[1] == n_collocation - 1
-        assert u.shape[1] == Nt
+        assert u.shape[1] == n_collocation - 1
             
-        self.input = u
+        self._input = u
         self._state = x
         self._algState = z
         self._interpolatorX = pdq.interpolator(continuity='both')
         self._interpolatorZ = pdq.interpolator(continuity='right')
+        self._interpolatorU = pdq.interpolator(continuity='right')
         self._pdq = pdq
 
 
@@ -38,8 +39,11 @@ class SystemTrajectory:
         return self._interpolatorZ(self._algState, t)
 
 
+    def input(self, t):
+        return self._interpolatorU(self._input, t)
+
+
     @property
     def time(self):
         return self._pdq.intervalBounds
 
-            
