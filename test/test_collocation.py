@@ -15,6 +15,63 @@ from casadi_tools import dae_model
 import matplotlib.pyplot as plt
 
 
+class PolynomialBasisTest(unittest.TestCase):
+    '''
+    Tests for PolynomialBasis class
+    '''
+
+    def test_interpolationMatrix(self):
+        N = 3
+        tau = cl.collocationPoints(N, 'legendre')
+        #tau = np.array([-1, 0])
+        basis = cl.PolynomialBasis(tau)
+
+        # Coefficients of the collocation equation
+        C = np.zeros((N+1,N+1))
+
+        # Coefficients of the continuity equation
+        D = np.zeros(N+1)
+
+        # Coefficients of the quadrature function
+        B = np.zeros(N+1)
+
+        # Construct polynomial basis manually
+        for j in range(N + 1):
+            # Construct Lagrange polynomials to get the polynomial basis at the collocation point
+            p = np.poly1d([1])
+            for r in range(N + 1):
+                if r != j:
+                    p *= np.poly1d([1, -tau[r]]) / (tau[j]-tau[r])
+
+            # Evaluate the polynomial at the final time to get the coefficients of the continuity equation
+            D[j] = p(1.0)
+
+            # Evaluate the time derivative of the polynomial at all collocation points to get the coefficients of the continuity equation
+            pder = np.polyder(p)
+            for r in range(N + 1):
+                C[j,r] = pder(tau[r])
+
+            # Evaluate the integral of the polynomial to get the coefficients of the quadrature function
+            pint = np.polyint(p)
+            B[j] = pint(1.0)
+
+        nptest.assert_allclose(basis.D, C.T)
+        nptest.assert_allclose(basis.interpolationMatrix(1.0), np.atleast_2d(D))
+        nptest.assert_allclose(basis.interpolationMatrix(0), np.atleast_2d((np.arange(N + 1) == 0).astype(float)))
+
+
+    def test_interpolationMatrixChebyshev(self):
+
+        N = 3
+        tau = cl.collocationPoints(N, 'chebyshev')
+        basis = cl.PolynomialBasis(tau)
+
+        nptest.assert_allclose(basis.interpolationMatrix([0.0, 1.0]), np.array([
+            [1, 0, 0, 0],
+            [0, 0, 0, 1]
+        ]))
+
+
 class PdqTest(unittest.TestCase):
     """
     Tests for the Pdq class
@@ -78,8 +135,8 @@ class PdqTest(unittest.TestCase):
 
         nptest.assert_equal(np.array(pdq.expandInput(u)),
             cs.DM([
-                [1, 1, 2, 2],
-                [3, 3, 4, 4]
+                [1, 1, 1, 2, 2, 2],
+                [3, 3, 3, 4, 4, 4]
             ])
         )
 
@@ -156,20 +213,40 @@ class IvpTest(unittest.TestCase):
         tf = 1
         pdq = cl.Pdq(t=[0, tf], poly_order=N)
 
-        var = ct.struct_symMX([
-            ct.entry('X', shape=(1, N))
-        ])
-
+        X = cs.MX.sym('X', 1, N)
         f = cs.Function('f', [x], [xdot])
         F = f.map(N, 'serial')
 
         x0 = cs.MX.sym('x0')
-        eq = cs.Function('eq', [var, x0], 
-            [cs.reshape(F(cs.horzcat(x0, var['X', :, : -1])) - pdq.derivative(cs.horzcat(x0, var['X'])), var.size, 1)])
+        eq = cs.Function('eq', [cs.vec(X), x0], 
+            [cs.vec(F(X) - pdq.derivative(cs.horzcat(x0, X))[:, 1 :])])
         rf = cs.rootfinder('rf', 'newton', eq)
 
-        sol = var(rf(var(0), 1))
-        nptest.assert_allclose(sol['X', :, -1], 1 * np.exp(1 * tf))
+        sol = cs.reshape(rf(cs.DM.zeros(X.shape), 1), X.shape)
+        nptest.assert_allclose(sol[:, -1], 1 * np.exp(1 * tf))
+
+
+    def test_ivp1(self):
+        """Test solving IVP1 with collocation
+        """
+        x = cs.MX.sym('x')
+        xdot = x
+
+        N = 10
+        tf = 1
+        pdq = cl.Pdq(t=[0, tf], poly_order=N)
+
+        X = cs.MX.sym('X', 1, N + 1)
+        f = cs.Function('f', [x], [xdot])
+        F = f.map(N + 1, 'serial')
+
+        x0 = cs.MX.sym('x0')
+        eq = cs.Function('eq', [cs.vec(X)], 
+            [cs.vec(F(X) - pdq.derivative(X))])
+        rf = cs.rootfinder('rf', 'newton', eq)
+
+        sol = cs.reshape(rf(cs.DM.zeros(X.shape)), X.shape)
+        nptest.assert_allclose(sol[:, -1], 1 * np.exp(1 * tf))
 
 
 class CollocationIntegratorTest(unittest.TestCase):

@@ -55,12 +55,39 @@ class PolynomialBasis(object):
 
         self.poly = p
         self.D = D
-        self.tau = tau
+        self.tau = np.array(tau)
+        self._lam = lam
 
     
     @property
     def numPoints(self):
         return len(self.tau)
+
+
+    def interpolationMatrix(self, t):
+        '''Interpolation matrix to points t.
+        '''
+
+        t = np.atleast_1d(t)    # Convert to numpy type s.t. the indexing below works
+        assert np.ndim(t) == 1 
+        
+        r = []
+        for xi in t:
+            # Check if xi is in tau
+            ind = xi == self.tau
+
+            if np.any(ind):
+                # At a node
+                assert np.sum(ind) == 1
+                y = ind.astype(float)
+            else:
+                # Between nodes
+                y = (self._lam / (xi - self.tau)) / np.sum(self._lam / (xi - self.tau))
+
+            r.append(y)
+
+        return np.vstack(r)
+
 
 
 class Pdq(object):
@@ -87,26 +114,24 @@ class Pdq(object):
         collocation_groups = []
         basis = []
         k = 0
+        interval_index = []
 
         for i in range(N):
             t_i = collocationPoints(poly_order, polynomial_type) * (t[i + 1] - t[i]) + t[i]
             basis_i = PolynomialBasis(t_i)
-            D_i = basis_i.D
             
-            assert D_i.shape[0] == poly_order + 1 and D_i.shape[1] == poly_order + 1
             assert t_i.shape == (poly_order + 1,)
 
             # Ensure that the points are from left to right.
             assert np.all(np.diff(t_i) > 0)
 
             basis.append(basis_i)
-            collocation_points.append(t_i[: -1])
-            collocation_groups.append(np.arange(k, k + poly_order + 1))
-            k += poly_order
+            collocation_points.append(t_i)
+            collocation_groups.append(np.arange(k, k + basis_i.numPoints))
+            interval_index.append(k)
+            k += basis_i.numPoints
 
-        # Append the last point.
-        # TODO: is it needed or not?
-        collocation_points.append(t_i[-1])
+        interval_index.append(k)
 
         # Stack collocation points in one vector
         collocation_points = np.hstack(collocation_points)
@@ -116,27 +141,27 @@ class Pdq(object):
 
         # Indices of collocation points belonging to the same interval, including both ends.
         self._collocationGroups = collocation_groups
-        self._intervalBounds = t
+        self._intervalBounds = np.array(t)
         self._polyOrder = poly_order
-
-        # Big sparse differentiation matrix
-        N = len(collocation_points)
-        bigD = cs.DM(N, N)
-
-        i = 0
-        for b in basis:
-            bigD[i : i + b.numPoints - 1, i : i + b.numPoints] = b.D[: -1, :]
-            i += b.numPoints - 1
-
-        bigD[-1, -basis[-1].numPoints :] = basis[-1].D[-1, :]
-
-        self._bigD = bigD
+        self._intervalIndex = np.array(interval_index)
 
 
     @property
     def collocationPoints(self):
         """Collocation points"""
         return self._collocationPoints
+
+
+    @property
+    def numCollocationPoints(self):
+        '''Total number of collocation points'''
+        return len(self._collocationPoints)
+
+
+    @property
+    def intervalIndex(self):
+        '''Indices corresponding to bounds of collocation intervals.'''
+        return self._intervalIndex
 
 
     @property
@@ -155,6 +180,12 @@ class Pdq(object):
     def polyOrder(self):
         """Degree of interpolating polynomial"""
         return self._polyOrder
+
+
+    @property
+    def basis(self):
+        '''Polynomial bases on each interval'''
+        return self._basis
 
 
     @property
@@ -180,26 +211,40 @@ class Pdq(object):
     def derivative(self, y):
         """Calculate derivative from function values
         """
+        assert y.shape[1] == self.numCollocationPoints
+        
+        dy = []
+        k = 0
 
-        return cs.mtimes(y, self._bigD[: -1, :].T)
+        for b in self._basis:
+            dy.append(cs.mtimes(y[:, k : k + b.numPoints], b.D.T))
+            k += b.numPoints
+
+        return cs.horzcat(*dy)
 
 
     def integral(self, dy):
         """Calculate integral from derivative values
         """
 
+        assert dy.shape[1] == self.numCollocationPoints
+
         y0 = cs.MX.zeros(dy.shape[0])
         y = []
         k = 0
-        for b in self._basis:
+        for i, b in enumerate(self._basis):
             N = b.numPoints - 1
 
             # Calculate y the equation 
             # dy = cs.mtimes(y[:, 1 :], D[: -1, 1 :].T)
             #invD = cs.inv(D[: -1, 1 :])
             #y.append(cs.transpose(cs.mtimes(invD, cs.transpose(dy[:, k : k + N]))))
+
+            # TODO: this is correct only if both end points are collocation points
+            # TODO: there should be a more precise way without dropping one point
+            assert np.all(b.tau[[0, -1]] == self._intervalBounds[[i, i + 1]])
             y.append(cs.transpose(cs.solve(b.D[: -1, 1 :], cs.transpose(dy[:, k : k + N]))) + cs.repmat(y0, 1, N))
-            k += N
+            k += b.numPoints
             y0 = y[-1][:, -1]
 
         return cs.horzcat(*y)
@@ -211,7 +256,7 @@ class Pdq(object):
 
         n = self.numIntervals
         assert u.shape[1] == n
-        return cs.horzcat(*[cs.repmat(u[:, k], 1, len(self._collocationGroups[k]) - 1) for k in range(n)])
+        return cs.horzcat(*[cs.repmat(u[:, k], 1, b.numPoints) for k, b in enumerate(self._basis)])
 
 
     def interpolator(self, continuity='both'):
@@ -223,30 +268,26 @@ class Pdq(object):
         - 'both' means that the function is continuous both from the left and from the right.
         """
 
-        # Transform collocation groups depending on the continuity option.
-        groups = []
+        groups = self._collocationGroups
 
-        for g in self._collocationGroups:
-            if continuity == 'both':
-                groups.append(g)
-            elif continuity == 'left':
-                groups.append(g[1 : ])
-            elif continuity == 'right':
-                groups.append(g[: -1])
-            else:
-                raise ValueError('Invalid "continuity" value {0} in Pdq.interpolator()'.format(continuity))
+        if continuity == 'left':
+            side = 'right'
+        elif continuity == 'right':
+            side = 'left'
+        else:
+            raise ValueError('Invalid "continuity" value {0} in Pdq.interpolator()'.format(continuity))
 
-        fi_cl = [barycentricInterpolator(self._collocationPoints[g]) for g in groups]
+        fi_cl = [barycentricInterpolator(b.tau) for b in self._basis]
 
         def interp(x, t):
-            expected_x_cols = self._collocationPoints.size if continuity == 'both' else self._collocationPoints.size - 1
+            expected_x_cols = self._collocationPoints.size
             if x.shape[1] != expected_x_cols:
                 raise ValueError('Invalid number of columns in interpolation point matrix')
 
             l = []
             
             for ti in np.atleast_1d(t):
-                i = np.clip(np.searchsorted(self._intervalBounds, ti, 'right') - 1, 0, len(self._intervalBounds) - 2)  # interval index
+                i = np.clip(np.searchsorted(self._intervalBounds, ti, side) - 1, 0, len(self._intervalBounds) - 2)  # interval index
                 l.append(fi_cl[i](x[:, groups[i]], ti))
 
             return np.hstack(l)
@@ -317,7 +358,7 @@ def cheb(N, t0, tf):
     @return a tuple (D, t) where D is a (N+1)-by-(N+1) differentiation matrix 
     and t is a vector of points of length N+1 such that t[0] == t0 and t[-1] == tf.
 
-    TODO: deprecate
+    TODO: deprecate?
     """
     
     tau = collocationPoints(N, 'chebyshev')

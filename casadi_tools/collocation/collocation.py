@@ -29,16 +29,16 @@ class CollocationScheme(object):
         # Convert whatever DAE to implicit DAE
         dae = dae.makeImplicit()
 
-        N = len(pdq.collocationPoints)
-        NT = len(pdq.intervalBounds) - 1
+        N = pdq.numCollocationPoints
+        NT = pdq.numIntervals
 
         #
         # Define variables and functions corresponfing to all control intervals
         # 
         Xc = cs.MX.sym('Xc', dae.nx, N)
-        Zc = cs.MX.sym('Zc', dae.nz, N - 1)
+        Zc = cs.MX.sym('Zc', dae.nz, N)
         U = cs.MX.sym('U', dae.nu, NT)
-        Uc = cs.horzcat(*[cs.repmat(U[:, k], 1, pdq.polyOrder) for k in range(NT)])
+        Uc = cs.horzcat(*[cs.repmat(U[:, k], 1, b.numPoints) for k, b in enumerate(pdq.basis)])
 
         # Points at which the derivatives are calculated
         tc = pdq.collocationPoints
@@ -57,18 +57,24 @@ class CollocationScheme(object):
 
         if repeat_param:
             reduce_in = []
-            p = cs.MX.sym('P', dae.np, N - 1)
+            p = cs.MX.sym('P', dae.np, N)
         else:
             reduce_in = [4]
             p = cs.MX.sym('P', dae.np)
 
-        dae_map = dae_fun.map('dae_map', parallelization, N - 1, reduce_in, [])
+        dae_map = dae_fun.map('dae_map', parallelization, N, reduce_in, [])
 
         xdot = pdq.derivative(Xc)
-        dae_out = dae_map(xdot=xdot, x=Xc[:, : -1], z=Zc, u=Uc, p=p, t=tc[: -1], tdp=tdp_val[:, : -1])
+        dae_out = dae_map(xdot=xdot, x=Xc, z=Zc, u=Uc, p=p, t=tc, tdp=tdp_val)
+
+        # Point indices on which to apply collocation equation
+        #apply_collocation = np.hstack([np.arange(pdq.intervalIndex[i] + 1, pdq.intervalIndex[i + 1]) for i in range(NT)])            
+        apply_collocation = []
+        for i in range(NT):
+            apply_collocation += range(pdq.intervalIndex[i] + 1, pdq.intervalIndex[i + 1])            
 
         eqc = [
-            cs.vec(dae_out['dae']),
+            cs.vec(dae_out['dae'][:, apply_collocation]),
             cs.vec(cs.diff(p, 1, 1))
         ]
 
@@ -85,7 +91,7 @@ class CollocationScheme(object):
         self._u = U
         self._uc = Uc
         self._q = Qc
-        self._x0 = Xc[:, range(0, N - 1, pdq.polyOrder)]
+        #self._x0 = Xc[:, range(0, N - 1, pdq.polyOrder)]
         self._p = p
         self._t = tc
         self._pdq = pdq
@@ -152,6 +158,7 @@ class CollocationScheme(object):
         return self._q
 
 
+    '''
     @property
     def x0(self):
         """State at the beginning of each control interval
@@ -159,6 +166,7 @@ class CollocationScheme(object):
         TODO: deprecate?
         """
         return self._x0
+    '''
         
 
     @property
@@ -202,7 +210,7 @@ def collocationIntegrator(name, dae, pdq, tdp_fun=None):
     # Initial point for the rootfinder
     w0 = ct.struct_MX(var)
     w0['x'] = cs.repmat(x0, 1, N)
-    w0['z'] = cs.repmat(z0, 1, N - 1)
+    w0['z'] = cs.repmat(z0, 1, N)
     
     sol = var(rf(w0, x0, dae.u, dae.p))
     sol_X = sol['x']
