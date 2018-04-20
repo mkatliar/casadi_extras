@@ -168,10 +168,24 @@ class Pdq(object):
         - 'both' means that the function is continuous both from the left and from the right.
         """
 
+        return _PdqInterpolator(self, continuity)
+
+
+class _PdqInterpolator(object):
+
+    def __init__(self, pdq, continuity='both'):
+        """Create interpolating function based on values at collocation points
+
+        @param specifies continuity of the interpolated function at the interval boundaries:
+        - 'left' means that the function in continuous from the left,
+        - 'right' means that the function in continuous from the right,
+        - 'both' means that the function is continuous both from the left and from the right.
+        """
+
         # Transform collocation groups depending on the continuity option.
         groups = []
 
-        for g in self._collocationGroups:
+        for g in pdq._collocationGroups:
             if continuity == 'both':
                 groups.append(g)
             elif continuity == 'left':
@@ -181,22 +195,28 @@ class Pdq(object):
             else:
                 raise ValueError('Invalid "continuity" value {0} in Pdq.interpolator()'.format(continuity))
 
-        fi_cl = [barycentricInterpolator(self._collocationPoints[g]) for g in groups]
+        self._basis = [PolynomialBasis(pdq._collocationPoints[g]) for g in groups]
+        self._pdq = pdq
+        self._continuity = continuity
+        self._groups = groups
+        
 
-        def interp(x, t):
-            expected_x_cols = self._collocationPoints.size if continuity == 'both' else self._collocationPoints.size - 1
-            if x.shape[1] != expected_x_cols:
-                raise ValueError('Invalid number of columns in interpolation point matrix')
+    def __call__(self, x, t):
+        pdq = self._pdq
+        continuity = self._continuity
+        groups = self._groups
 
-            l = []
-            
-            for ti in np.atleast_1d(t):
-                i = np.clip(np.searchsorted(self._intervalBounds, ti, 'right') - 1, 0, len(self._intervalBounds) - 2)  # interval index
-                l.append(fi_cl[i](x[:, groups[i]], ti))
+        expected_x_cols = pdq._collocationPoints.size if continuity == 'both' else pdq._collocationPoints.size - 1
+        if x.shape[1] != expected_x_cols:
+            raise ValueError('Invalid number of columns in interpolation point matrix')
 
-            return np.hstack(l)
+        l = []
+        
+        for ti in np.atleast_1d(t):
+            i = np.clip(np.searchsorted(pdq._intervalBounds, ti, 'right') - 1, 0, len(pdq._intervalBounds) - 2)  # interval index
+            l.append(np.dot(x[:, groups[i]], self._basis[i].interpolationMatrix(ti).T))
 
-        return interp
+        return np.hstack(l)
 
 
 class CollocationScheme(object):
