@@ -506,6 +506,20 @@ class CasadiStructureDerivable:
     if isinstance(a,SX):
       return SXStruct(self,data=a)
 
+
+  def parseMatrix(self, data):
+    '''Split data matrix according to a structure.
+
+    Each column of the data is treatet as a vector consistent with the struct structure.
+
+    @return a dict with the same keys as struct and values being submatrices of data 
+      corresponding to struct fields.
+    '''
+    
+    return dict((k, horzcat(*[self(d)[k] for d in data.T])) for k in self.keys())
+  
+
+
   def repeated(self,arg=0):
     (a,mtype) = self.argtype(arg)
 

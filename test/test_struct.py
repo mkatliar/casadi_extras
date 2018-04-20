@@ -54,6 +54,43 @@ class StructTest(unittest.TestCase):
         self.assertRaises(Exception, s, {'x': np.array([2, 3]), 'y': np.array([42, 43])})
 
 
+    def test_parseMatrix(self):
+        '''Test parsing a matrix as CasADi structures.
+        '''
+
+        s = ct.struct_symMX([
+            ct.entry('x', shape=2),
+            ct.entry('y', shape=3)
+        ])
+
+        data = np.array([
+            [1, 2, 3],
+            [4, 5, 6],
+            [7, 8, 9],
+            [10, 11, 12],
+            [13, 14, 15]
+        ])
+
+        res = s.parseMatrix(data)
+        
+        self.assertEqual(set(res), {'x', 'y'})
+
+        nptest.assert_equal(np.array(res['x']),
+            cs.DM([
+                [1, 2, 3],
+                [4, 5, 6]
+            ])
+        )
+            
+        nptest.assert_equal(np.array(res['y']),
+            cs.DM([
+                [7, 8, 9],
+                [10, 11, 12],
+                [13, 14, 15]
+            ])
+        )
+
+
 if __name__ == '__main__':
     #import sys;sys.argv = ['', 'IvpTest.test_collocation_integrator_dae_with_quad']
     unittest.main()

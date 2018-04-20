@@ -1,4 +1,4 @@
-from .collocation import CollocationScheme, cheb, Pdq
+from .collocation import CollocationScheme, cheb, Pdq, collocationIntegrator
 from .system_trajectory import SystemTrajectory
 from .dae_model import SemiExplicitDae, ImplicitDae
 from .inequality import Inequality, BoundedVariable
