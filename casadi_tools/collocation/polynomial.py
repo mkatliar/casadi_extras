@@ -55,12 +55,38 @@ class PolynomialBasis(object):
 
         self.poly = p
         self.D = D
-        self.tau = tau
+        self.tau = np.array(tau)
+        self._lam = lam
 
     
     @property
     def numPoints(self):
         return len(self.tau)
+
+
+    def interpolationMatrix(self, t):
+        '''Interpolation matrix to points t.
+        '''
+
+        t = np.atleast_1d(t)    # Convert to numpy type s.t. the indexing below works
+        assert np.ndim(t) == 1 
+        
+        r = []
+        for xi in t:
+            # Check if xi is in tau
+            ind = xi == self.tau
+
+            if np.any(ind):
+                # At a node
+                assert np.sum(ind) == 1
+                y = ind.astype(float)
+            else:
+                # Between nodes
+                y = (self._lam / (xi - self.tau)) / np.sum(self._lam / (xi - self.tau))
+
+            r.append(y)
+
+        return np.vstack(r)
 
 
 def polynomialInterpolator(x):
@@ -126,7 +152,7 @@ def cheb(N, t0, tf):
     @return a tuple (D, t) where D is a (N+1)-by-(N+1) differentiation matrix 
     and t is a vector of points of length N+1 such that t[0] == t0 and t[-1] == tf.
 
-    TODO: deprecate
+    TODO: deprecate?
     """
     
     tau = collocationPoints(N, 'chebyshev')
