@@ -103,37 +103,10 @@ def polynomialInterpolator(x):
 def barycentricInterpolator(x):
     """Barycentric interpolator with nodes at x"""
 
-    assert np.ndim(x) == 1
-    N = np.size(x) - 1
-    n = np.arange(N + 1)
-    x = np.atleast_1d(x)    # Convert to numpy type s.t. the indexing below works
-
-    a = [np.prod(x[j] - x[n[n != j]]) for j in n]
+    basis = PolynomialBasis(x)
 
     def p(u, xq):
-        r = []
-
-        # Convert scalar argument to a vector
-        xq = np.atleast_1d(xq)
-        
-        # Converting to np.array is a workaround for https://github.com/casadi/casadi/issues/2221
-        u = np.array(u)
-
-        for xi in xq:
-            # Check if xi is in x
-            ind = xi == x
-
-            if np.any(ind):
-                # At a node
-                assert np.sum(ind) == 1
-                y = u[:, ind]
-            else:
-                # Between nodes
-                y = np.dot(u, np.atleast_2d(1 / (a * (xi - x))).T) / np.sum(1 / (a * (xi - x)))
-
-            r.append(y)
-
-        return np.hstack(r)
+        return np.dot(u, basis.interpolationMatrix(xq).T)
 
     return p
 
