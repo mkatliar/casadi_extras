@@ -23,7 +23,10 @@ class PolynomialBasis(object):
         '''Make polynomial basis at the points tau.
         '''
 
-        n = len(tau)
+        tau = np.atleast_1d(tau)
+        assert tau.ndim == 1
+
+        n = tau.size
         p = []
 
         for j in range(n):
