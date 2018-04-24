@@ -224,7 +224,7 @@ class CollocationScheme(object):
     for a given DAE model and differentiation matrix.
     """
 
-    def __init__(self, dae, pdq, parallelization='serial', tdp_fun=None, expand=True, repeat_param=False):
+    def __init__(self, dae, pdq, parallelization='serial', tdp_fun=None, expand=True, repeat_param=False, options={}):
         """Constructor
 
         @param pdq Pdq object
@@ -275,7 +275,7 @@ class CollocationScheme(object):
             reduce_in = [4]
             p = cs.MX.sym('P', dae.np)
 
-        dae_map = dae_fun.map('dae_map', parallelization, N - 1, reduce_in, [])
+        dae_map = dae_fun.map('dae_map', parallelization, N - 1, reduce_in, [], options)
 
         xdot = pdq.derivative(Xc)
         dae_out = dae_map(xdot=xdot, x=Xc[:, : -1], z=Zc, u=Uc, p=p, t=tc[: -1], tdp=tdp_val[:, : -1])
