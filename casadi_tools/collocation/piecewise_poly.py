@@ -40,12 +40,12 @@ class PiecewisePoly(object):
 
 
     def __call__(self, t, continuity='right'):
-        """Calculate function values at given points.
+        """Evaluate piecewise-polynomial values at given points.
 
-        @param t points at which to calculate values
+        @param t points at which to calculate values. Can be a scalar of a vector.
         @param continuity specifies which value to return at interval boundaries:
         - 'left' means the value from the left interval
-        - 'right' means the value from the right,
+        - 'right' means the value from the right interval
         """
 
         if continuity not in ['left', 'right']:
