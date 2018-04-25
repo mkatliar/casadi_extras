@@ -286,7 +286,8 @@ class CollocationScheme(object):
         ]
 
         # Calculate the quadrature
-        Qc = pdq.integral(dae_out['quad'])
+        quad = dae_out['quad']
+        Qc = pdq.integral(quad)
 
         self._N = N
         self._NT = NT
@@ -297,6 +298,7 @@ class CollocationScheme(object):
         self._z = Zc
         self._u = U
         self._uc = Uc
+        self._quad = quad
         self._q = Qc
         self._x0 = Xc[:, range(0, N - 1, pdq.polyOrder)]
         self._p = p
@@ -364,6 +366,12 @@ class CollocationScheme(object):
         """Quadrature state at collocation points"""
         return self._q
 
+
+    @property
+    def quad(self):
+        """Quadrature state derivative at collocation points"""
+        return self._quad
+        
 
     @property
     def x0(self):
