@@ -72,6 +72,7 @@ class PolynomialBasisTest(unittest.TestCase):
         ]))
 
 
+@unittest.skip('Pdq class test disable, Pdq class is frozen')
 class PdqTest(unittest.TestCase):
     """
     Tests for the Pdq class
@@ -141,6 +142,52 @@ class PdqTest(unittest.TestCase):
         )
 
 
+    def test_ivp(self):
+        """Test solving IVP with collocation
+        """
+        x = cs.MX.sym('x')
+        xdot = x
+
+        N = 10
+        tf = 1
+        pdq = cl.Pdq(t=[0, tf], poly_order=N)
+
+        X = cs.MX.sym('X', 1, N)
+        f = cs.Function('f', [x], [xdot])
+        F = f.map(N, 'serial')
+
+        x0 = cs.MX.sym('x0')
+        eq = cs.Function('eq', [cs.vec(X), x0], 
+            [cs.vec(F(X) - pdq.derivative(cs.horzcat(x0, X))[:, 1 :])])
+        rf = cs.rootfinder('rf', 'newton', eq)
+
+        sol = cs.reshape(rf(cs.DM.zeros(X.shape), 1), X.shape)
+        nptest.assert_allclose(sol[:, -1], 1 * np.exp(1 * tf))
+
+
+    def test_ivp1(self):
+        """Test solving IVP1 with collocation
+        """
+        x = cs.MX.sym('x')
+        xdot = x
+
+        N = 10
+        tf = 1
+        pdq = cl.Pdq(t=[0, tf], poly_order=N)
+
+        X = cs.MX.sym('X', 1, N + 1)
+        f = cs.Function('f', [x], [xdot])
+        F = f.map(N + 1, 'serial')
+
+        x0 = cs.MX.sym('x0')
+        eq = cs.Function('eq', [cs.vec(X)], 
+            [cs.vec(F(X) - pdq.derivative(X))])
+        rf = cs.rootfinder('rf', 'newton', eq)
+
+        sol = cs.reshape(rf(cs.DM.zeros(X.shape)), X.shape)
+        nptest.assert_allclose(sol[:, -1], 1 * np.exp(1 * tf))
+
+
 class ChebTest(unittest.TestCase):
     """
     Test for the cheb function
@@ -198,57 +245,6 @@ class DiffTest(unittest.TestCase):
         nptest.assert_allclose(np.dot(D, y), y + np.exp(t) * np.cos(5 * t) * 5, atol=1e-8, rtol=0)
 
 
-class IvpTest(unittest.TestCase):
-    """
-    Solving initial value problem with collocation method test
-    """
-
-    def test_ivp(self):
-        """Test solving IVP with collocation
-        """
-        x = cs.MX.sym('x')
-        xdot = x
-
-        N = 10
-        tf = 1
-        pdq = cl.Pdq(t=[0, tf], poly_order=N)
-
-        X = cs.MX.sym('X', 1, N)
-        f = cs.Function('f', [x], [xdot])
-        F = f.map(N, 'serial')
-
-        x0 = cs.MX.sym('x0')
-        eq = cs.Function('eq', [cs.vec(X), x0], 
-            [cs.vec(F(X) - pdq.derivative(cs.horzcat(x0, X))[:, 1 :])])
-        rf = cs.rootfinder('rf', 'newton', eq)
-
-        sol = cs.reshape(rf(cs.DM.zeros(X.shape), 1), X.shape)
-        nptest.assert_allclose(sol[:, -1], 1 * np.exp(1 * tf))
-
-
-    def test_ivp1(self):
-        """Test solving IVP1 with collocation
-        """
-        x = cs.MX.sym('x')
-        xdot = x
-
-        N = 10
-        tf = 1
-        pdq = cl.Pdq(t=[0, tf], poly_order=N)
-
-        X = cs.MX.sym('X', 1, N + 1)
-        f = cs.Function('f', [x], [xdot])
-        F = f.map(N + 1, 'serial')
-
-        x0 = cs.MX.sym('x0')
-        eq = cs.Function('eq', [cs.vec(X)], 
-            [cs.vec(F(X) - pdq.derivative(X))])
-        rf = cs.rootfinder('rf', 'newton', eq)
-
-        sol = cs.reshape(rf(cs.DM.zeros(X.shape)), X.shape)
-        nptest.assert_allclose(sol[:, -1], 1 * np.exp(1 * tf))
-
-
 class CollocationIntegratorTest(unittest.TestCase):
     '''Unit tests for collocation integrator.
     '''
@@ -259,13 +255,11 @@ class CollocationIntegratorTest(unittest.TestCase):
         x = cs.MX.sym('x')
         xdot = x
 
-        N = 10
+        N = 9
         tf = 1
         
         dae = dae_model.SemiExplicitDae(x=x, ode=xdot)
-        pdq = cl.Pdq([0, tf], poly_order=N)
-        
-        integrator = cl.collocationIntegrator('integrator', dae, pdq)
+        integrator = cl.collocationIntegrator('integrator', dae, t=[0, tf], order=N)
         sol = integrator(x0=1)
 
         nptest.assert_allclose(sol['xf'], 1 * np.exp(1 * tf))
@@ -278,15 +272,13 @@ class CollocationIntegratorTest(unittest.TestCase):
         t = cs.MX.sym('t')
         xdot = t ** 2
 
-        N = 10
+        N = 9
         x0 = 1.1
         t0 = 2.4
         tf = 3.9
         
-        dae = dae_model.SemiExplicitDae(x=x, ode=xdot, t=t)
-        pdq = cl.Pdq([t0, tf], poly_order=N)
-        
-        integrator = cl.collocationIntegrator('integrator', dae, pdq)
+        dae = dae_model.SemiExplicitDae(x=x, ode=xdot, t=t)        
+        integrator = cl.collocationIntegrator('integrator', dae, t=[t0, tf], order=N)
         sol = integrator(x0=x0)
 
         nptest.assert_allclose(sol['xf'], x0 + tf ** 3 / 3 - t0 ** 3 / 3)
@@ -301,13 +293,11 @@ class CollocationIntegratorTest(unittest.TestCase):
         xdot = z + u
         alg = z*z - x
 
-        N = 10
+        N = 9
         tf = 2
         
         dae = dae_model.SemiExplicitDae(x=x, z=z, u=u, ode=xdot, alg=alg)
-        pdq = cl.Pdq([0, tf], poly_order=N)
-        
-        integrator = cl.collocationIntegrator('integrator', dae, pdq)
+        integrator = cl.collocationIntegrator('integrator', dae, t=[0, tf], order=N)
 
         # The analytic solution is
         # x(t) = 1/4 * (t + c)^2, c = 1 (+-) 2 * sqrt(x(-1))
@@ -326,13 +316,11 @@ class CollocationIntegratorTest(unittest.TestCase):
         alg = z*z - x
         q = x
 
-        N = 10
+        N = 9
         tf = 2
         
         dae = dae_model.SemiExplicitDae(x=x, z=z, ode=xdot, alg=alg, quad=q)
-        pdq = cl.Pdq([0, tf], poly_order=N)
-        
-        integrator = cl.collocationIntegrator('integrator', dae, pdq)
+        integrator = cl.collocationIntegrator('integrator', dae, t=[0, tf], order=N)
 
         # The analytic solution is
         # x(t) = 1/4 * (t + c)^2, c = 1 (+-) 2 * sqrt(x(-1))
@@ -348,6 +336,27 @@ class CollocationIntegratorTest(unittest.TestCase):
 class CollocationSchemeTest(unittest.TestCase):
     '''Tests for CollocationScheme.
     '''
+
+    def test_ivp(self):
+        """Test solving IVP with collocation
+        """
+        x = cs.MX.sym('x')
+        xdot = x
+        dae = dae_model.SemiExplicitDae(x=x, ode=xdot)
+
+        N = 4
+        tf = 1
+        scheme = cl.CollocationScheme(dae=dae, t=[0, tf], order=N, method='legendre')
+
+        x0 = cs.MX.sym('x0')
+        var = scheme.combine(['x', 'K'])
+
+        eqf = cs.Function('eq', [cs.vec(var), x0], [cs.vertcat(scheme.eq, scheme.x[:, 0] - x0)])
+        rf = cs.rootfinder('rf', 'newton', eqf)
+
+        sol = var(rf(var(0), 1))
+        nptest.assert_allclose(sol['x', :, -1], np.atleast_2d(1 * np.exp(1 * tf)))
+
 
     def test_directCollocationSimple(self):
         """Test direct collocation on a very simple model
@@ -368,20 +377,17 @@ class CollocationSchemeTest(unittest.TestCase):
         quad = x['v']**2
 
         NT = 2  # number of control intervals
-        N = 3   # number of collocation intervals per control interval
+        N = 3   # number of collocation points per interval
         ts = 1  # time step
 
-        # PDQ
-        pdq = cl.Pdq(np.arange(NT + 1) * ts, poly_order=N)
-        
         # DAE model
         dae = dae_model.SemiExplicitDae(x=x.cat, ode=ode.cat, u=u, quad=quad)
 
         # Create direct collocation scheme
-        scheme = cl.CollocationScheme(dae, pdq)
+        scheme = cl.CollocationScheme(dae=dae, t=np.arange(NT + 1) * ts, order=N)
 
         # Optimization variable
-        w = scheme.combine(['x', 'z', 'u'])
+        w = scheme.combine(['x', 'K', 'Z', 'u'])
 
         # Objective
         f = scheme.q[:, -1]
@@ -431,20 +437,17 @@ class CollocationSchemeTest(unittest.TestCase):
         quad = u**2
 
         NT = 5  # number of control intervals
-        N = 3   # number of collocation intervals per control interval
+        N = 3   # number of collocation points per interval
         ts = 1  # time step
 
-        # PDQ
-        pdq = cl.Pdq(np.arange(NT + 1) * ts, poly_order=N)
-        
         # DAE model
         dae = dae_model.SemiExplicitDae(x=x.cat, ode=ode.cat, u=u, quad=quad)
 
         # Create direct collocation scheme
-        scheme = cl.CollocationScheme(dae, pdq)
+        scheme = cl.CollocationScheme(dae=dae, t=np.arange(NT + 1) * ts, order=N)
 
         # Optimization variable
-        w = scheme.combine(['x', 'z', 'u'])
+        w = scheme.combine(['x', 'K', 'u'])
 
         # Objective
         f = scheme.q[:, -1]
@@ -452,7 +455,7 @@ class CollocationSchemeTest(unittest.TestCase):
         # Constraints
         g = ct.struct_MX([
             ct.entry('eq', expr=scheme.eq),
-            ct.entry('initial', expr=scheme.x0[:, 0]),     # q0 = 0, v0 = 0
+            ct.entry('initial', expr=scheme.x[:, 0]),     # q0 = 0, v0 = 0
             ct.entry('final', expr=scheme.x[:, -1] - np.array([1, 0]))   # qf = 1, vf = 0
         ])
 
@@ -470,13 +473,16 @@ class CollocationSchemeTest(unittest.TestCase):
         # Check against the known solution
         nptest.assert_allclose(sol_w['u'], [[0.2, 0.1, 0, -0.1, -0.2]], atol=1e-16)
 
-        plt.plot(scheme.t, sol_w['x'].T, '.-')
+        plt.plot(scheme.t, sol_w['x'].T, 'o')
         plt.hold(True)
 
-        fi = pdq.interpolator()
-        t = np.linspace(0, NT * ts, num=50)
-        plt.plot(t, fi(sol_w['x'], t).T)
+        plt.plot(scheme.tc, scheme.evalX(sol_w['x'], sol_w['K']).T, 'x')
 
+        fi = scheme.piecewisePolyX(sol_w['x'], sol_w['K'])
+        t, val = fi.discretize(ts / 10.)
+        plt.plot(t, val.T)
+
+        plt.grid(True)
         plt.show()
 
 

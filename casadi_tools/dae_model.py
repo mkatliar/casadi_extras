@@ -150,6 +150,11 @@ class Dae(object):
         return self._tdp.numel()
 
 
+    @property
+    def nq(self):
+        return self._quad.numel()
+
+
     def createFunction(self, name, in_arg, out_arg):
         return cs.Function(name, [self._get(n) for n in in_arg], [self._get(n) for n in out_arg], in_arg, out_arg)
 
