@@ -227,7 +227,7 @@ class CollocationScheme(object):
     """
 
     def __init__(self, dae, t, order, method='legendre', 
-        parallelization='serial', tdp_fun=None, expand=True, repeat_param=False):
+        parallelization='serial', tdp_fun=None, expand=True, repeat_param=False, options={}):
 
         """Constructor
 
@@ -297,7 +297,7 @@ class CollocationScheme(object):
             reduce_in = [4]
             p = cs.MX.sym('P', dae.np)
 
-        dae_map = dae_fun.map('dae_map', parallelization, N * M, reduce_in, [])
+        dae_map = dae_fun.map('dae_map', parallelization, N * M, reduce_in, [], options)
         dae_out = dae_map(xdot=K, x=X, z=Z, u=U, p=p, t=tc, tdp=tdp_val)
 
         eqc = ct.struct_MX([
