@@ -505,7 +505,7 @@ def collocationIntegrator(name, dae, t, order, method='legendre', tdp_fun=None):
     w0['K'] = cs.MX.zeros(scheme.K.shape)
     w0['Z'] = cs.repmat(z0, 1, scheme.Z.shape[1])
     
-    sol = var(rf(w0, x0, dae.u, dae.p))
+    sol = var(rf(w0, x0, scheme.u, dae.p))
     sol_x = sol['x']
     sol_K = sol['K']
     sol_Z = sol['Z']
@@ -514,7 +514,7 @@ def collocationIntegrator(name, dae, t, order, method='legendre', tdp_fun=None):
 
     # TODO: return correct value for zf!
     return cs.Function(name, 
-        [x0, z0, dae.u, dae.p], [sol_x[:, -1], np.repeat(np.nan, dae.nz), sol_q[:, -1], sol_X, sol_Z, sol_Q], 
+        [x0, z0, scheme.u, dae.p], [sol_x[:, 1 :], np.repeat(np.nan, dae.nz), sol_q[:, -1], sol_X, sol_Z, sol_Q], 
         ['x0', 'z0', 'u', 'p'], ['xf', 'zf', 'qf', 'X', 'Z', 'Q'])
 
 

@@ -249,8 +249,8 @@ class CollocationIntegratorTest(unittest.TestCase):
     '''Unit tests for collocation integrator.
     '''
 
-    def test_collocation_integrator_ode(self):
-        """Test collocation_integrator function with ODE
+    def test_collocationIntegrator_ode(self):
+        """Test collocationIntegrator function with ODE
         """
         x = cs.MX.sym('x')
         xdot = x
@@ -263,6 +263,48 @@ class CollocationIntegratorTest(unittest.TestCase):
         sol = integrator(x0=1)
 
         nptest.assert_allclose(sol['xf'], 1 * np.exp(1 * tf))
+
+
+    def test_collocationIntegrator_ode_with_input(self):
+        """Test collocation_integrator function with ODE and control input
+        """
+        x = cs.MX.sym('x')
+        u = cs.MX.sym('u')
+        xdot = x + u
+
+        N = 9
+        tf = 1
+        
+        dae = dae_model.SemiExplicitDae(x=x, u=u, ode=xdot)
+        integrator = cl.collocationIntegrator('integrator', dae, t=[0, tf], order=N)
+
+        x0 = 1
+        u0 = 0.1
+        sol = integrator(x0=1, u=u0)
+
+        nptest.assert_allclose(sol['xf'], (x0 + u0) * np.exp(tf) - u0)
+
+
+    def test_collocationIntegrator_ode_with_input_multistep(self):
+        """Test collocation_integrator function with ODE and multi-step control input
+        """
+        x = cs.MX.sym('x')
+        u = cs.MX.sym('u')
+        xdot = x + u
+
+        N = 9
+        t = [0, 1, 2]
+        
+        dae = dae_model.SemiExplicitDae(x=x, u=u, ode=xdot)
+        integrator = cl.collocationIntegrator('integrator', dae, t=t, order=N)
+
+        x0 = 1
+        u = np.atleast_2d([[0.1, -0.2]])
+        sol = integrator(x0=1, u=u)
+
+        xf = sol['xf']
+        nptest.assert_allclose(xf[:, 0], np.atleast_2d((x0 + u[:, 0]) * np.exp(t[1] - t[0]) - u[:, 0]))
+        nptest.assert_allclose(xf[:, 1], np.atleast_2d((xf[:, 0] + u[:, 1]) * np.exp(t[2] - t[1]) - u[:, 1]))
 
 
     def test_collocation_integrator_ode_time_dependent(self):
