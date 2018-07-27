@@ -484,38 +484,66 @@ class CollocationScheme(object):
         return PiecewisePoly(self._t, coeff, basis)
 
 
+class CollocationIntegrator(cs.Function):
+    """Collocation integrator function.
+    """
+
+    def __init__(self, name, dae, t, order, method='legendre', tdp_fun=None):
+        """Make an integrator based on collocation method
+        """
+
+        N = order
+        scheme = CollocationScheme(dae, t=t, order=order, method=method, tdp_fun=tdp_fun)
+
+        x0 = cs.MX.sym('x0', dae.nx)
+        z0 = dae.z
+
+        # Solve the collocation equations w.r.t. (x,K,Z)
+        var = scheme.combine(['x', 'K', 'Z'])
+        eq = cs.Function('eq', [var, x0, scheme.u, scheme.p], [cs.vertcat(scheme.eq, scheme.x[:, 0] - x0)])
+        rf = cs.rootfinder('rf', 'newton', eq)
+
+        # Initial point for the rootfinder
+        w0 = ct.struct_MX(var)
+        w0['x'] = cs.repmat(x0, 1, scheme.x.shape[1])
+        w0['K'] = cs.MX.zeros(scheme.K.shape)
+        w0['Z'] = cs.repmat(z0, 1, scheme.Z.shape[1])
+        
+        sol = var(rf(w0, x0, scheme.u, dae.p))
+        sol_x = sol['x']
+        sol_K = sol['K']
+        sol_Z = sol['Z']
+        [sol_q, sol_Q, sol_X] = cs.substitute([scheme.q, scheme.Q, scheme.X], 
+            [scheme.x, scheme.K, scheme.Z], [sol_x, sol_K, sol_Z])
+
+        # TODO: return correct value for zf!
+        # TODO: return only x instead of x and xf?
+        super().__init__(name, 
+            [x0, z0, scheme.u, dae.p], 
+            [sol_x[:, 1 :], np.repeat(np.nan, dae.nz), sol_q[:, -1], sol_X, sol_Z, sol_Q, sol_x, sol_K, scheme.tc],
+            ['x0', 'z0', 'u', 'p'], 
+            ['xf', 'zf', 'qf', 'X', 'Z', 'Q', 'x', 'K', 'tc'])
+
+        self._scheme = scheme
+
+
+    def integrate(self, *args, **kwargs):
+        """Integrate and return piecewise-polynomial state trajectory.
+        """
+
+        # Call the cs.Function
+        out = self.__call__(*args, **kwargs)
+
+        # Add output trajectory
+        out['x_traj'] = self._scheme.piecewisePolyX(out['x'], out['K'])
+
+        return out
+
+
 def collocationIntegrator(name, dae, t, order, method='legendre', tdp_fun=None):
     """Make an integrator based on collocation method
     """
-
-    N = order
-    scheme = CollocationScheme(dae, t=t, order=order, method=method, tdp_fun=tdp_fun)
-
-    x0 = cs.MX.sym('x0', dae.nx)
-    z0 = dae.z
-
-    # Solve the collocation equations w.r.t. (x,K,Z)
-    var = scheme.combine(['x', 'K', 'Z'])
-    eq = cs.Function('eq', [var, x0, scheme.u, scheme.p], [cs.vertcat(scheme.eq, scheme.x[:, 0] - x0)])
-    rf = cs.rootfinder('rf', 'newton', eq)
-
-    # Initial point for the rootfinder
-    w0 = ct.struct_MX(var)
-    w0['x'] = cs.repmat(x0, 1, scheme.x.shape[1])
-    w0['K'] = cs.MX.zeros(scheme.K.shape)
-    w0['Z'] = cs.repmat(z0, 1, scheme.Z.shape[1])
-    
-    sol = var(rf(w0, x0, scheme.u, dae.p))
-    sol_x = sol['x']
-    sol_K = sol['K']
-    sol_Z = sol['Z']
-    [sol_q, sol_Q, sol_X] = cs.substitute([scheme.q, scheme.Q, scheme.X], 
-        [scheme.x, scheme.K, scheme.Z], [sol_x, sol_K, sol_Z])
-
-    # TODO: return correct value for zf!
-    return cs.Function(name, 
-        [x0, z0, scheme.u, dae.p], [sol_x[:, 1 :], np.repeat(np.nan, dae.nz), sol_q[:, -1], sol_X, sol_Z, sol_Q], 
-        ['x0', 'z0', 'u', 'p'], ['xf', 'zf', 'qf', 'X', 'Z', 'Q'])
+    return CollocationIntegrator(name, dae, t, order, method, tdp_fun)
 
 
 class CollocationSimulator(object):
