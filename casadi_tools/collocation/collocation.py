@@ -269,15 +269,17 @@ class CollocationScheme(object):
         h = np.diff(t)
 
         # Integrated state at collocation points
-        X = cs.horzcat(
-            *[cs.repmat(x[:, n], 1, M) + h[n] * cs.mtimes(K[:, n * M : (n + 1) * M], butcher.A.T) for n in range(N)])
+        Mx = cs.kron(cs.DM.eye(N), cs.DM.ones(1, M))
+        MK = cs.kron(cs.diagcat(*h), butcher.A.T)    # integration matrix
+        X = cs.mtimes(x[:, : -1], Mx) + cs.mtimes(K, MK)
 
         # Integrated state at the ends of collocation intervals
-        xf = x[:, : -1] + cs.horzcat(*[h[n] * cs.mtimes(K[:, n * M : (n + 1) * M], butcher.b) for n in range(N)])
+        xf = x[:, : -1] + cs.mtimes(K, cs.kron(cs.diagcat(*h), butcher.b))
         
         # Points in time at which the collocation equations are calculated
+        # TODO: this possibly can be sped up a little bit.
         tc = np.hstack([t[n] + h[n] * butcher.c for n in range(N)])
-
+        
         # Values of the time-dependent parameter
         if tdp_fun is not None:
             tdp_val = cs.horzcat(*[tdp_fun(t) for t in tc])
@@ -309,12 +311,17 @@ class CollocationScheme(object):
         # Integrate the quadrature state
         quad = dae_out['quad']
 
-        Q = []  # Integrated quadrature at collocation points
+        #t0 = time.time()
         q = [cs.MX.zeros(dae.nq)]  # Integrated quadrature at interval ends
         
+        # TODO: speed up the calculation of q.
         for n in range(N):
-            Q.append(cs.repmat(q[-1], 1, M) + h[n] * cs.mtimes(quad[:, n * M : (n + 1) * M], butcher.A.T))
             q.append(q[-1] + h[n] * cs.mtimes(quad[:, n * M : (n + 1) * M], butcher.b))
+
+        q = cs.horzcat(*q)
+
+        Q = cs.mtimes(q[:, : -1], Mx) + cs.mtimes(quad, MK)  # Integrated quadrature at collocation points
+        #print('Creating Q took {0:.3f} s.'.format(time.time() - t0))
 
         self._N = N
         self._M = M
@@ -327,8 +334,8 @@ class CollocationScheme(object):
         self._U = U
         self._u = u
         self._quad = quad
-        self._Q = cs.horzcat(*Q)
-        self._q = cs.horzcat(*q)
+        self._Q = Q
+        self._q = q
         self._p = p
         self._tc = tc
         self._butcher = butcher
