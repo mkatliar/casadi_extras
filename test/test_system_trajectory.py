@@ -1,7 +1,7 @@
 '''
 '''
 
-from casadi_tools import Pdq, SystemTrajectory
+from casadi_extras import Pdq, SystemTrajectory
 import unittest
 import numpy as np
 import numpy.testing as nptest

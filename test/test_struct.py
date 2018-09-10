@@ -7,7 +7,7 @@ import unittest
 import numpy.testing as nptest
 import numpy as np
 import casadi as cs
-import casadi_tools as ct
+import casadi_extras as ce
 
 
 class StructTest(unittest.TestCase):
@@ -19,9 +19,9 @@ class StructTest(unittest.TestCase):
         '''Test creation of CasADi structs from Python structs.
         '''
 
-        s = ct.struct_symMX([
-            ct.entry('x', shape=2),
-            ct.entry('y', shape=3)
+        s = ce.struct_symMX([
+            ce.entry('x', shape=2),
+            ce.entry('y', shape=3)
         ])
 
         sn = s({'x': np.array([2, 3]), 'y': 42})
@@ -34,9 +34,9 @@ class StructTest(unittest.TestCase):
         '''Test creation of CasADi structs from Python structs with invalid keys.
         '''
 
-        s = ct.struct_symMX([
-            ct.entry('x', shape=2),
-            ct.entry('y', shape=3)
+        s = ce.struct_symMX([
+            ce.entry('x', shape=2),
+            ce.entry('y', shape=3)
         ])
 
         self.assertRaises(Exception, s, {'x': np.array([2, 3]), 'yy': 42})
@@ -46,9 +46,9 @@ class StructTest(unittest.TestCase):
         '''Test creation of CasADi structs from Python structs with invalid shape.
         '''
 
-        s = ct.struct_symMX([
-            ct.entry('x', shape=2),
-            ct.entry('y', shape=3)
+        s = ce.struct_symMX([
+            ce.entry('x', shape=2),
+            ce.entry('y', shape=3)
         ])
 
         self.assertRaises(Exception, s, {'x': np.array([2, 3]), 'y': np.array([42, 43])})
@@ -58,9 +58,9 @@ class StructTest(unittest.TestCase):
         '''Test parsing a matrix as CasADi structures.
         '''
 
-        s = ct.struct_symMX([
-            ct.entry('x', shape=2),
-            ct.entry('y', shape=3)
+        s = ce.struct_symMX([
+            ce.entry('x', shape=2),
+            ce.entry('y', shape=3)
         ])
 
         data = np.array([

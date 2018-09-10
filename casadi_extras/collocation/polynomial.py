@@ -3,7 +3,7 @@ Collocation method
 """
 import numpy as np
 import casadi as cs
-import casadi_tools as ct
+import casadi_extras as ce
 
 
 def collocationPoints(order, scheme):

@@ -3,7 +3,7 @@ Collocation method
 """
 import numpy as np
 import casadi as cs
-import casadi_tools as ct
+import casadi_extras as ce
 
 from .polynomial import PolynomialBasis, collocationPoints, barycentricInterpolator
 from .butcher import butcherTableuForCollocationMethod
@@ -302,10 +302,10 @@ class CollocationScheme(object):
         dae_map = dae_fun.map('dae_map', parallelization, N * M, reduce_in, [], options)
         dae_out = dae_map(xdot=K, x=X, z=Z, u=U, p=p, t=tc, tdp=tdp_val)
 
-        eqc = ct.struct_MX([
-            ct.entry('collocation', expr=dae_out['dae']),
-            ct.entry('continuity', expr=xf - x[:, 1 :]),
-            ct.entry('param', expr=cs.diff(p, 1, 1))
+        eqc = ce.struct_MX([
+            ce.entry('collocation', expr=dae_out['dae']),
+            ce.entry('continuity', expr=xf - x[:, 1 :]),
+            ce.entry('param', expr=cs.diff(p, 1, 1))
         ])
 
         # Integrate the quadrature state
@@ -476,7 +476,7 @@ class CollocationScheme(object):
         what_set = ['K', 'x', 'Z', 'U', 'u', 'p', 'eq', 'q']
         assert all([w in what_set for w in what])
 
-        return ct.struct_MX([ct.entry(w, expr=getattr(self, w)) for w in what])
+        return ce.struct_MX([ce.entry(w, expr=getattr(self, w)) for w in what])
 
 
     def piecewisePolyX(self, x, K):
@@ -511,7 +511,7 @@ class CollocationIntegrator(cs.Function):
         rf = cs.rootfinder('rf', 'newton', eq)
 
         # Initial point for the rootfinder
-        w0 = ct.struct_MX(var)
+        w0 = ce.struct_MX(var)
         w0['x'] = cs.repmat(x0, 1, scheme.x.shape[1])
         w0['K'] = cs.MX.zeros(scheme.K.shape)
         w0['Z'] = cs.repmat(z0, 1, scheme.Z.shape[1])
@@ -576,7 +576,7 @@ class CollocationSimulator(object):
         rf = cs.rootfinder('rf', 'newton', eq)
 
         # Initial point for the rootfinder
-        w0 = ct.struct_MX(var)
+        w0 = ce.struct_MX(var)
         w0['x'] = cs.repmat(x0, 1, N)
         w0['z'] = cs.repmat(z0, 1, N - 1)
         
@@ -603,4 +603,4 @@ class CollocationSimulator(object):
         u = cs.horzcat(*[input(t) for t in self._pdq.collocationPoints])
         res = self._simulate(x0=x0, z0=cs.DM.zeros(self._dae.nz), u=u, p=param)
 
-        return ct.SystemTrajectory()
+        return ce.SystemTrajectory()

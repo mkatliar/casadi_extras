@@ -2,9 +2,9 @@ import unittest
 import numpy.testing as nptest
 import numpy as np
 import casadi as cs
-import casadi_tools as ct
+import casadi_extras as ce
 
-from casadi_tools.collocation import PiecewisePoly, PolynomialBasis
+from casadi_extras.collocation import PiecewisePoly, PolynomialBasis
 
 import matplotlib.pyplot as plt
 

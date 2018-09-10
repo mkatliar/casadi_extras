@@ -7,10 +7,10 @@ import unittest
 import numpy.testing as nptest
 import numpy as np
 import casadi as cs
-import casadi_tools as ct
+import casadi_extras as ce
 
-import casadi_tools.collocation as cl
-from casadi_tools import dae_model
+import casadi_extras.collocation as cl
+from casadi_extras import dae_model
 
 import matplotlib.pyplot as plt
 
@@ -405,14 +405,14 @@ class CollocationSchemeTest(unittest.TestCase):
         """
 
         # Double integrator model
-        x = ct.struct_symMX([
-            ct.entry('q'),
-            ct.entry('v')
+        x = ce.struct_symMX([
+            ce.entry('q'),
+            ce.entry('v')
         ])
         
         u = cs.MX.sym('u')
         
-        ode = ct.struct_MX(x)
+        ode = ce.struct_MX(x)
         ode['q'] = x['v']
         ode['v'] = u
 
@@ -435,10 +435,10 @@ class CollocationSchemeTest(unittest.TestCase):
         f = scheme.q[:, -1]
 
         # Constraints
-        g = ct.struct_MX([
-            ct.entry('eq', expr=scheme.eq),
-            ct.entry('initial', expr=scheme.x[:, 0]),     # q0 = 0, v0 = 0
-            ct.entry('final', expr=scheme.x[:, -1] - np.array([1, 0]))   # qf = 1, vf = 0
+        g = ce.struct_MX([
+            ce.entry('eq', expr=scheme.eq),
+            ce.entry('initial', expr=scheme.x[:, 0]),     # q0 = 0, v0 = 0
+            ce.entry('final', expr=scheme.x[:, -1] - np.array([1, 0]))   # qf = 1, vf = 0
         ])
 
         # Make NLP
@@ -465,14 +465,14 @@ class CollocationSchemeTest(unittest.TestCase):
         """
 
         # Double integrator model
-        x = ct.struct_symMX([
-            ct.entry('q'),
-            ct.entry('v')
+        x = ce.struct_symMX([
+            ce.entry('q'),
+            ce.entry('v')
         ])
         
         u = cs.MX.sym('u')
         
-        ode = ct.struct_MX(x)
+        ode = ce.struct_MX(x)
         ode['q'] = x['v']
         ode['v'] = u
 
@@ -495,10 +495,10 @@ class CollocationSchemeTest(unittest.TestCase):
         f = scheme.q[:, -1]
 
         # Constraints
-        g = ct.struct_MX([
-            ct.entry('eq', expr=scheme.eq),
-            ct.entry('initial', expr=scheme.x[:, 0]),     # q0 = 0, v0 = 0
-            ct.entry('final', expr=scheme.x[:, -1] - np.array([1, 0]))   # qf = 1, vf = 0
+        g = ce.struct_MX([
+            ce.entry('eq', expr=scheme.eq),
+            ce.entry('initial', expr=scheme.x[:, 0]),     # q0 = 0, v0 = 0
+            ce.entry('final', expr=scheme.x[:, -1] - np.array([1, 0]))   # qf = 1, vf = 0
         ])
 
         # Make NLP

@@ -3,7 +3,7 @@ Support for DAE formulation
 """
 
 import casadi as cs
-import casadi_tools as ct
+import casadi_extras as ce
 
 
 class Dae(object):
@@ -269,6 +269,6 @@ def parallel(models):
     
     d = {}
     for attr in ['x', 'z', 'u', 'p', 'ode', 'alg', 'quad']: # TODO: what do we do with t?
-        d[attr] = ct.struct_MX([ct.entry('model_{0}'.format(i), expr=getattr(m, attr)) for i, m in enumerate(models)])
+        d[attr] = ce.struct_MX([ce.entry('model_{0}'.format(i), expr=getattr(m, attr)) for i, m in enumerate(models)])
 
     return Dae(**d)
