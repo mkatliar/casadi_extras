@@ -450,6 +450,9 @@ class CollocationSchemeTest(unittest.TestCase):
 
         # Run NLP solver
         sol = solver(lbg=0, ubg=0)
+        if np.isnan(float(sol['f'])):
+            raise RuntimeError('Nlp Solver failed')
+            
         sol_w = w(sol['x'])
 
         # Check agains the known solution
@@ -510,6 +513,10 @@ class CollocationSchemeTest(unittest.TestCase):
 
         # Run NLP solver
         sol = solver(lbg=0, ubg=0)
+
+        if np.isnan(float(sol['f'])):
+            raise RuntimeError('Nlp Solver failed')
+
         sol_w = w(sol['x'])
 
         # Check against the known solution
