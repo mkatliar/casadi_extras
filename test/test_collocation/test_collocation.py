@@ -542,8 +542,6 @@ class CollocationSchemeTest(unittest.TestCase):
         nptest.assert_allclose(sol_w['u'], [[0.2, 0.1, 0, -0.1, -0.2]], atol=1e-16)
 
         plt.plot(scheme.t, sol_w['x'].T, 'o')
-        plt.hold(True)
-
         plt.plot(scheme.tc, scheme.evalX(sol_w['x'], sol_w['K']).T, 'x')
 
         fi = scheme.piecewisePolyX(sol_w['x'], sol_w['K'])
