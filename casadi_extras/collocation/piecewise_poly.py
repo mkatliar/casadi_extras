@@ -106,3 +106,11 @@ class PiecewisePoly(object):
             y.append(np.dot(self._coefficients[i], self._basis.interpolationMatrix(tau).T))
 
         return np.hstack(x), np.atleast_2d(np.hstack(y))
+
+
+    def derivative(self):
+        '''Return a PiecewisePoly which is the derivative of the original one.
+        '''
+
+        return PiecewisePoly(self._intervals,
+            [np.dot(c, self._basis.D.T) / (self._intervals[i + 1] - self._intervals[i]) for i, c in enumerate(self._coefficients)], self._basis)
