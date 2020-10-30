@@ -33,7 +33,7 @@ class PiecewisePoly(object):
 
         @param intervals list of N+1 points in ascending order defining N intervals.
         @param coefficients list of N matrices, each of them defining basis coefficients on one interval.
-        @param basis PolynomialBasis defined on interval [0, 1]
+        @param basis a PolynomialBasis defined on interval [0, 1]
         """
 
         assert len(intervals) > 1
@@ -114,3 +114,18 @@ class PiecewisePoly(object):
 
         return PiecewisePoly(self._intervals,
             [np.dot(c, self._basis.D.T) / (self._intervals[i + 1] - self._intervals[i]) for i, c in enumerate(self._coefficients)], self._basis)
+
+
+    def poly(self, n):
+        '''Return polynomials on specified interval.
+
+        @param n interval number
+        @return list of polynomials p such that
+        p[i](t) = self(interval[n] + t)[i, :]
+        '''
+        p = self._basis.compose(self._coefficients[n])
+        for p_i in p:
+            p_i.coef /= (self.intervals[n + 1] - self.intervals[n]) ** np.flip(np.arange(self._basis.order + 1))
+
+        return p
+

@@ -91,6 +91,24 @@ class PolynomialBasisTest(unittest.TestCase):
         ]))
 
 
+    def test_compose(self):
+        N = 3
+        tau = cl.collocationPoints(N, 'legendre')
+        basis = cl.PolynomialBasis(tau)
+
+        c = np.array([
+            [1, 2, 3],
+            [4, 5, 6]
+        ])
+
+        q = basis.compose(c)
+
+        self.assertEqual(len(q), c.shape[0])
+
+        nptest.assert_allclose(q[0].coef, c[0, 0] * basis.poly[0] + c[0, 1] * basis.poly[1] + c[0, 2] * basis.poly[2])
+        nptest.assert_allclose(q[1].coef, c[1, 0] * basis.poly[0] + c[1, 1] * basis.poly[1] + c[1, 2] * basis.poly[2])
+
+
 @unittest.skip('Pdq class test disable, Pdq class is frozen')
 class PdqTest(unittest.TestCase):
     """

@@ -63,5 +63,19 @@ class PiecewisePolyTest(unittest.TestCase):
         plt.show()
 
 
+    def test_poly(self):
+        '''Test interval polynomials.
+        '''
+        pp = PiecewisePoly([-10, 0, 30], [np.random.rand(2, 3), np.random.rand(2, 3)], PolynomialBasis([0, 0.5, 1]))
+
+        for k in range(pp.numIntervals):
+            p_k = pp.poly(k)
+            n_test_points = 10
+            t = (pp.intervals[k + 1] - pp.intervals[k]) * np.arange(n_test_points) / n_test_points
+
+            for i, p_k_i in enumerate(p_k):
+                nptest.assert_allclose(p_k_i(t), pp(pp.intervals[k] + t)[i, :])
+
+
 if __name__ == '__main__':
     unittest.main()

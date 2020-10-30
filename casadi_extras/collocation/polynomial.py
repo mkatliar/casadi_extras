@@ -39,11 +39,14 @@ class PolynomialBasis(object):
     '''
     
     def __init__(self, tau):
-        '''Make polynomial basis at the points tau.
+        '''Make basis of Lagrange polynomials with given roots.
+
+        @param tau roots of the polynomials
         '''
 
         tau = np.atleast_1d(tau)
         assert tau.ndim == 1
+        assert len(tau) > 0
 
         n = tau.size
         p = []
@@ -86,8 +89,17 @@ class PolynomialBasis(object):
         return len(self.tau)
 
 
+    @property 
+    def order(self):
+        '''Order of basis polynomials
+        '''
+        return len(self.tau) - 1
+
+
     def interpolationMatrix(self, t):
-        '''Interpolation matrix to points t.
+        '''Interpolation matrix for specified interpolation points.
+
+        @param t interpolation points
         '''
 
         t = np.atleast_1d(t)    # Convert to numpy type s.t. the indexing below works
@@ -111,8 +123,29 @@ class PolynomialBasis(object):
         return np.vstack(r)
 
 
+    def compose(self, c):
+        '''Make polynomials from their decomposition in the basis.
+
+        @param c matrix of basis coefficients of size M-by-N.
+        @return the list of resulting polynomials, which are
+        $q_i=\sum_{j=0}^{N-1} c_{i,j} p_j$ where i=0..M.
+        '''
+        M, N = np.shape(c)
+        q = []
+        
+        for i in range(M):
+            q_i = np.poly1d([0])
+            for j in range(N):
+                q_i += c[i, j] * self.poly[j]
+            q.append(q_i)
+
+        return q
+
+
+
 def polynomialInterpolator(x):
-    """Polynomial interpolator with nodes at x"""
+    """Polynomial interpolator with nodes at x
+    """
 
     assert x.ndim == 1
     N = x.size - 1
@@ -123,7 +156,8 @@ def polynomialInterpolator(x):
 
 
 def barycentricInterpolator(x):
-    """Barycentric interpolator with nodes at x"""
+    """Barycentric interpolator with nodes at x
+    """
 
     basis = PolynomialBasis(x)
 
