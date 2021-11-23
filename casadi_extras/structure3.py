@@ -1,22 +1,22 @@
 ##
 ## Copyright (c) 2018 Mikhail Katliar.
-## 
-## This file is part of CasADi Extras 
+##
+## This file is part of CasADi Extras
 ## (see https://github.com/mkatliar/casadi_extras).
 ##
 ## This file is a derived work based on structure3.py file from the CasADi framework:
 ## https://github.com/casadi/casadi/blob/master/swig/python/tools/structure3.py
-## 
+##
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU Lesser General Public License as published by
 ## the Free Software Foundation, either version 3 of the License, or
 ## (at your option) any later version.
-## 
+##
 ## This program is distributed in the hope that it will be useful,
 ## but WITHOUT ANY WARRANTY; without even the implied warranty of
 ## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ## GNU Lesser General Public License for more details.
-## 
+##
 ## You should have received a copy of the GNU Lesser General Public License
 ## along with this program. If not, see <http://www.gnu.org/licenses/>.
 ##
@@ -258,7 +258,7 @@ class StructEntry:
                       payload = payloadUnpack(payload,i)
                     )
                  for i in range(s)]
-        elif isinstance(p, collections.Callable):
+        elif isinstance(p, collections.abc.Callable):
           r = p(self.traverseByPowerIndex(
                 powerIndex[1:],
                 dims=dims,
@@ -415,7 +415,7 @@ class Structure(object):
                        payload=payloadUnpack(payload,i)
                      )
                  for i,s in enumerate(p)]
-        elif isinstance(p, collections.Callable):
+        elif isinstance(p, collections.abc.Callable):
           r = p(self.traverseByPowerIndex(
                 powerIndex[1:],
                 canonicalIndex=canonicalIndex,
@@ -511,13 +511,13 @@ class CasadiStructureDerivable:
 
     Each column of the data is treated as a vector consistent with the struct structure.
 
-    @return a dict with the same keys as struct and values being submatrices of data 
+    @return a dict with the same keys as struct and values being submatrices of data
       corresponding to struct fields.
     '''
-    
+
     data = np.atleast_2d(data)
     return dict((k, horzcat(*[self(d)[k] for d in data.T])) for k in self.keys())
-  
+
 
 
   def repeated(self,arg=0):
@@ -647,7 +647,7 @@ class SetterDispatcher(Dispatcher):
       raise CompatibilityException("Error in canonicalIndex slicing for %s: Incompatible types in a[i]=b with a %s and b %s." % (str(canonicalIndex),str(self.master),str(payload)))
     except Exception as e:
       raise Exception("Error in powerIndex slicing for canonicalIndex %s" % (str(canonicalIndex))) from e
-      
+
 class MasterGettable:
   @properGetitem
   def __getitem__(self,powerIndex):
@@ -673,7 +673,7 @@ def delegation(extraIndex,entry,i):
 def performExtraIndex(i,extraIndex=None,entry=None,flip=False):
   if extraIndex is None or len(extraIndex)==0:
     return i
-  if isinstance(extraIndex[0], collections.Callable) and not isinstance(extraIndex[0],Delegater):
+  if isinstance(extraIndex[0], collections.abc.Callable) and not isinstance(extraIndex[0],Delegater):
     return extraIndex[0](performExtraIndex(i,extraIndex=extraIndex[1:],entry=entry,flip=flip))
   if not(isinstance(extraIndex[0],NestedDictLiteral)):
     if len(extraIndex)>2 or len(extraIndex)==0:
@@ -1024,7 +1024,7 @@ class msymStruct(CasadiStructured,MasterGettable,VertsplitStructure):
   def numel(self):
     return self.size
 
-  
+
 
 
 
@@ -1210,7 +1210,7 @@ class CasadiStructEntry(StructEntry):
 
     if 'repeat' in kwargs:
       self.repeat = kwargs["repeat"] if isinstance(kwargs["repeat"],list) else [kwargs["repeat"]]
-    
+
     if not all([is_integer(x) for x in self.repeat]):
       raise Exception("The 'repeat' argument, if present, must be a list of integers, but got %s" % str(self.repeat))
 
